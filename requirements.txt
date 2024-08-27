@@ -8,3 +8,4 @@ drf-yasg==1.21.7
 opencv-python==4.9.0.80
 PyYAML==6.0.1
 flower==2.0.1
+docker==6.1.3
