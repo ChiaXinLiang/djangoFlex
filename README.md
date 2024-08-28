@@ -1,21 +1,23 @@
 # djangoFlex
 A Django Framework Template for Flexibility
 
+## Overview
+
+djangoFlex is a template project for Django, designed to provide a quick start for various web applications. It sets up a basic Django project structure with some common configurations and includes server and client applications for RabbitMQ and MLflow integration.
+
 ## Provided Apps
 
 The djangoFlex template includes the following apps:
 
-1. **rabbitmq_client_app**: Utilities and views for RabbitMQ interactions.
+1. **servers.rabbitmq_server**: Server-side setup and configurations for RabbitMQ.
+   - Start and manage the RabbitMQ server using Docker.
+
+2. **servers.mlflow_server**: Server-side setup and configurations for MLflow.
+   - Start and manage the MLflow server using Docker.
+
+3. **clients.rabbitmq_client**: Client-side utilities and views for RabbitMQ interactions.
    - `send_message_view`: Send a message to a RabbitMQ queue.
    - `receive_message_view`: Receive a message from a RabbitMQ queue.
-
-2. **rabbitmq_server_app**: Server-side setup and configurations for RabbitMQ.
-   - Start and manage the RabbitMQ server using provided configuration files.
-
-
-## Overview
-
-djangoFlex is a template project for Django, designed to provide a quick start for various web applications. It sets up a basic Django project structure with some common configurations and instructions for adding your own apps.
 
 ## Getting Started
 
@@ -50,12 +52,14 @@ djangoFlex is a template project for Django, designed to provide a quick start f
    ```
    Edit the `.env` file with your specific settings.
 
-2. Apply the initial migrations:
+2. Update the `djangoFlex/config/servers.yaml` file with your desired server configurations.
+
+3. Apply the initial migrations:
    ```
    python manage.py migrate
    ```
 
-3. Create a superuser (admin):
+4. Create a superuser (admin):
    ```
    python manage.py createsuperuser
    ```
@@ -69,9 +73,33 @@ djangoFlex is a template project for Django, designed to provide a quick start f
 
 2. Open your web browser and go to `http://127.0.0.1:8000/` to see your Django project in action.
 
-3. Open your web browser and go to `http://127.0.0.1:8000/swagger/` to see the Swagger documentation for your Django project.
+3. Access the Swagger documentation at `http://127.0.0.1:8000/swagger/` to explore the available API endpoints.
 
+## Server Management
 
+### RabbitMQ Server
+
+- Start the RabbitMQ Docker container:
+  ```
+  http://127.0.0.1:8000/servers/rabbitmq_server/docker/server/
+  ```
+
+- Access the RabbitMQ management interface:
+  ```
+  http://127.0.0.1:8000/servers/rabbitmq_dashboard/
+  ```
+
+### MLflow Server
+
+- Start the MLflow Docker container:
+  ```
+  http://127.0.0.1:8000/servers/mlflow_server/docker/server/
+  ```
+
+- Access the MLflow UI:
+  ```
+  http://127.0.0.1:8000/servers/mlflow_dashboard/
+  ```
 
 ## Adding Your Own App
 
@@ -110,12 +138,15 @@ djangoFlex is a template project for Django, designed to provide a quick start f
 
 - Pre-configured Django project structure
 - Environment-based settings using python-decouple
+- YAML-based server configuration
+- Docker integration for RabbitMQ and MLflow servers
+- Swagger API documentation
 - Basic URL configuration
 - Instructions for adding new apps
 
 ## Customization
 
-Feel free to modify any part of the project to suit your needs. The `djangoFlex` directory contains the main project settings and URL configurations.
+Feel free to modify any part of the project to suit your needs. The `djangoFlex` directory contains the main project settings and URL configurations. Server configurations can be adjusted in the `djangoFlex/config/servers.yaml` file.
 
 ## Contributing
 
