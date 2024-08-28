@@ -150,6 +150,33 @@ SWAGGER_SETTINGS = {
 ROOT_URLCONF = 'djangoFlex.urls'
 
 # MLflow settings
+MLFLOW_TRACKING_URI = os.getenv('MLFLOW_TRACKING_URI', 'http://localhost:5000')
+MLFLOW_BACKEND_STORE = os.getenv('MLFLOW_BACKEND_STORE', 'mlruns')
+MLFLOW_SERVER_PORT = int(os.getenv('MLFLOW_SERVER_PORT', 5000))
+MLFLOW_SERVER_HOST = os.getenv('MLFLOW_SERVER_HOST', 'localhost')
+
+# MLflow Docker Configuration
+MLFLOW_DOCKER_IMAGE = 'ghcr.io/mlflow/mlflow'
+MLFLOW_DOCKER_CONTAINER_NAME = os.getenv('MLFLOW_DOCKER_CONTAINER_NAME', 'mlflow_container')
+
+# RabbitMQ settings
+RABBITMQ_HOST = os.getenv('RABBITMQ_HOST', 'localhost')
+RABBITMQ_PORT = int(os.getenv('RABBITMQ_PORT', 5672))
+RABBITMQ_DASHBOARD_PORT = os.getenv('RABBITMQ_DASHBOARD_PORT', 15672)
+RABBITMQ_USER = os.getenv('RABBITMQ_USER', 'guest')
+RABBITMQ_PASSWORD = os.getenv('RABBITMQ_PASSWORD', 'guest')
+RABBITMQ_VHOST = os.getenv('RABBITMQ_VHOST', '/')
+RABBITMQ_SERVER_PATH = os.getenv('RABBITMQ_SERVER_PATH', '/usr/sbin/rabbitmq-server')
+
+# Docker RabbitMQ Configuration
+RABBITMQ_DOCKER_IMAGE = os.getenv('RABBITMQ_DOCKER_IMAGE', 'rabbitmq:3-management')
+RABBITMQ_DOCKER_CONTAINER_NAME = os.getenv('RABBITMQ_DOCKER_CONTAINER_NAME', 'rabbitmq_container')
+
+
+# Celery Configuration
+CELERY_BROKER_URL = f'amqp://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}@{RABBITMQ_HOST}:{RABBITMQ_PORT}/{RABBITMQ_VHOST}'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+
 
 # Load test configuration
 servers_config = load_config_from_yaml(BASE_DIR / 'djangoFlex' / 'config' / 'servers.yaml')

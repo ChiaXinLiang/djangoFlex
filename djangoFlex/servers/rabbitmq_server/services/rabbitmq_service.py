@@ -7,7 +7,7 @@ class RabbitMQService:
     @staticmethod
     def start_server():
         try:
-            subprocess.Popen([settings.RABBITMQ_SERVER_PATH], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.Popen([settings.SERVERS_CONFIG['RABBITMQ_SERVER_PATH']], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             print("Starting RabbitMQ server...")
             time.sleep(10)  # Wait for the server to start
             print("RabbitMQ server started successfully.")
@@ -37,7 +37,7 @@ class RabbitMQService:
     @staticmethod
     def create_queue(queue_name):
         try:
-            connection = pika.BlockingConnection(pika.ConnectionParameters(host=settings.RABBITMQ_HOST))
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host=settings.SERVERS_CONFIG['RABBITMQ_HOST']))
             channel = connection.channel()
             channel.queue_declare(queue=queue_name)
             connection.close()
@@ -50,7 +50,7 @@ class RabbitMQService:
     @staticmethod
     def delete_queue(queue_name):
         try:
-            connection = pika.BlockingConnection(pika.ConnectionParameters(host=settings.RABBITMQ_HOST))
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host=settings.SERVERS_CONFIG['RABBITMQ_HOST']))
             channel = connection.channel()
             channel.queue_delete(queue=queue_name)
             connection.close()
@@ -63,7 +63,7 @@ class RabbitMQService:
     @staticmethod
     def list_queues():
         try:
-            connection = pika.BlockingConnection(pika.ConnectionParameters(host=settings.RABBITMQ_HOST))
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host=settings.SERVERS_CONFIG['RABBITMQ_HOST']))
             channel = connection.channel()
             queues = channel.queue_declare(queue='', exclusive=True).method.queue
             connection.close()

@@ -1,0 +1,99 @@
+列出磁碟區 OS 的資料夾 PATH
+磁碟區序號為 F4A1-0992
+C:.
+|   .gitignore
+|   LICENSE
+|   README.md
+|   requirements.txt
+|   tree.txt
+|   
++---app
+|   \---rabbitmq_client_app
+|           apps.py
+|           
++---config
+|       load_config_from_yaml.py
+|       
+\---djangoFlex
+    |   .env
+    |   db.sqlite3
+    |   manage.py
+    |   
+    +---app
+    +---clients
+    |   |   urls.py
+    |   |   
+    |   \---rabbitmq_client
+    |       |   admin.py
+    |       |   apps.py
+    |       |   models.py
+    |       |   rabbitmq_utils.py
+    |       |   tests.py
+    |       |   urls.py
+    |       |   views.py
+    |       |   __init__.py
+    |       |   
+    |       +---migrations
+    |       |   |   __init__.py
+    |       |   |   
+    |       |   \---__pycache__
+    |       \---__pycache__
+    +---config
+    |   |   load_config_from_yaml.py
+    |   |   servers.yaml
+    |   |   test.yaml
+    |   |   __init__.py
+    |   |   
+    |   \---__pycache__
+    |           load_config_from_yaml.cpython-312.pyc
+    |           __init__.cpython-312.pyc
+    |           
+    +---djangoFlex
+    |   |   asgi.py
+    |   |   settings.py
+    |   |   urls.py
+    |   |   wsgi.py
+    |   |   __init__.py
+    |   |   
+    |   \---__pycache__
+    |           settings.cpython-312.pyc
+    |           __init__.cpython-312.pyc
+    |           
+    +---extensions
+    \---servers
+        |   urls.py
+        |   __init__.py
+        |   
+        +---BaseService
+        |   |   BaseDockerService.py
+        |   |   BaseService.py
+        |   |   
+        |   \---__pycache__
+        +---mlflow_server
+        |   |   api.py
+        |   |   apps.py
+        |   |   urls.py
+        |   |   __init__.py
+        |   |   
+        |   +---services
+        |   |   |   mlflow_docker_service.py
+        |   |   |   mlflow_service.py
+        |   |   |   __init__.py
+        |   |   |   
+        |   |   \---__pycache__
+        |   \---__pycache__
+        +---rabbitmq_server
+        |   |   api.py
+        |   |   apps.py
+        |   |   urls.py
+        |   |   views.py
+        |   |   __init__.py
+        |   |   
+        |   +---services
+        |   |   |   rabbitmq_docker_service.py
+        |   |   |   rabbitmq_service.py
+        |   |   |   __init__.py
+        |   |   |   
+        |   |   \---__pycache__
+        |   \---__pycache__
+        \---__pycache__

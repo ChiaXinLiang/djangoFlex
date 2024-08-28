@@ -20,6 +20,8 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from django.conf import settings
+from django.views.generic.base import RedirectView
+
 
 schema_view = get_schema_view(
    openapi.Info(
@@ -39,6 +41,8 @@ urlpatterns = [
     re_path(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     re_path(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     path('admin/', admin.site.urls),
-    path('api/rabbitmq_server/', include('rabbitmq_server_app.urls')),
-    path('api/rabbitmq_client/', include('rabbitmq_client_app.urls')),
+    path('servers/', include('servers.urls')),  # Update this line
+    path('servers/rabbitmq_dashboard/', RedirectView.as_view(url=f'http://{settings.SERVERS_CONFIG["RABBITMQ_HOST"]}:{settings.SERVERS_CONFIG["RABBITMQ_DASHBOARD_PORT"]}/', permanent=False), name='rabbitmq_management'),
+    path('servers/mlflow_dashboard/', RedirectView.as_view(url=f'http://{settings.SERVERS_CONFIG["MLFLOW_SERVER_HOST"]}:{settings.SERVERS_CONFIG["MLFLOW_SERVER_PORT"]}/', permanent=False), name='mlflow_ui'),
+    # path('api/rabbitmq_client/', include('rabbitmq_client_app.urls')),
 ]
