@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RabbitMQ Client Example</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { text-align: center; }
+        form { display: flex; flex-direction: column; gap: 10px; }
+        input, button { padding: 5px; }
+        #messages { margin-top: 20px; border: 1px solid #ccc; padding: 10px; min-height: 200px; }
+    </style>
+</head>
+<body>
+    <h1>RabbitMQ Client Example</h1>
+    <form id="messageForm">
+        <input type="text" id="exchange" placeholder="Exchange" value="example_exchange">
+        <input type="text" id="exchangeType" placeholder="Exchange Type" value="direct">
+        <input type="text" id="queueName" placeholder="Queue Name" value="example_queue">
+        <input type="text" id="routingKey" placeholder="Routing Key" value="example_routing_key">
+        <input type="text" id="message" placeholder="Message">
+        <button type="submit">Send Message</button>
+    </form>
+    <button id="receiveMessage">Receive Message</button>
+    <div id="messages"></div>
+
+    <script>
+        const socket = io();
+        const messageForm = document.getElementById('messageForm');
+        const receiveButton = document.getElementById('receiveMessage');
+        const messagesDiv = document.getElementById('messages');
+
+        socket.on('message_sent', (data) => {
+            messagesDiv.innerHTML += `<p>Sent: ${data.status}</p>`;
+        });
+
+        socket.on('message_received', (data) => {
+            messagesDiv.innerHTML += `<p>Received: ${data.message}</p>`;
+        });
+
+        messageForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const data = {
+                exchange: document.getElementById('exchange').value,
+                exchange_type: document.getElementById('exchangeType').value,
+                queue_name: document.getElementById('queueName').value,
+                routing_key: document.getElementById('routingKey').value,
+                message: document.getElementById('message').value
+            };
+            // This will use MessageProducer.send_message_to_queue
+            socket.emit('send_message', data);
+        });
+
+        receiveButton.addEventListener('click', () => {
+            const data = {
+                exchange: document.getElementById('exchange').value,
+                exchange_type: document.getElementById('exchangeType').value,
+                queue_name: document.getElementById('queueName').value,
+                routing_key: document.getElementById('routingKey').value
+            };
+            // This will use MessageConsumer.receive_single_message
+            socket.emit('receive_message', data);
+        });
+    </script>
+</body>
+</html>

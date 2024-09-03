@@ -14,7 +14,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 import sys
-from config.load_config_from_yaml import load_config_from_yaml
+from djangoFlex.config.load_config_from_yaml import load_config_from_yaml
 
 # Add the parent directory to sys.path
 load_dotenv()
@@ -46,9 +46,13 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "drf_yasg",
-    'servers.rabbitmq_server',  # Updated path
-    'servers.mlflow_server',  # New MLflow server app
-    # 'rabbitmq_client_app',
+    'djangoFlex_servers.rabbitmq_server',  # Updated path
+    'djangoFlex_servers.mlflow_server',  # New MLflow server app
+    'djangoFlex_servers.srs_server',  # New SRS server app
+    'djangoFlex_servers.videoCap_server',  # New VideoCap server app
+    # 'clients.rabbitmq_client',
+    'channels',
+    # 'socketio',
 ]
 
 MIDDLEWARE = [
@@ -155,5 +159,47 @@ ROOT_URLCONF = 'djangoFlex.urls'
 servers_config = load_config_from_yaml(BASE_DIR / 'djangoFlex' / 'config' / 'servers.yaml')
 SERVERS_CONFIG = servers_config
 
+ASGI_APPLICATION = 'djangoFlex.routing.application'
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer'
+    }
+}
 
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'DEBUG',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'INFO',  # Set to INFO to suppress SQL query logs
+            'propagate': False,
+        },
+    },
+}
