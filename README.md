@@ -10,7 +10,7 @@ djangoFlex comes pre-loaded with a smorgasbord of goodies:
 2. 🧠 **MLflow Server**: Machine learning experiment tracking at your service.
 3. 📹 **Video Capture Server**: Stream and capture video like a pro.
 4. 🔌 **RabbitMQ Client**: Communicate with RabbitMQ effortlessly.
-5. 🎥 **SRS Server**: Simple RTMP Server for your streaming needs.
+5. 🎥 **SRS Server**: Simple RTMP Server for your streaming needs.(currently need close the srs docker container manually)
 
 ## 🚀 Quick Start
 
