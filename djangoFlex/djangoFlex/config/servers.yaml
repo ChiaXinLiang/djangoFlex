@@ -26,4 +26,9 @@ DJANGO_SECRET_KEY: "your-secret-key-here"
 DEBUG: False
 ALLOWED_HOSTS: []
 
-
+# SRS (Simple RTMP Server) Configuration
+SRS_SERVER_HOST: "localhost"
+SRS_SERVER_PORT: 1935
+SRS_HTTP_SERVER_PORT: 8080
+SRS_DOCKER_IMAGE: "ossrs/srs:5"
+SRS_DOCKER_CONTAINER_NAME: "srs_container"

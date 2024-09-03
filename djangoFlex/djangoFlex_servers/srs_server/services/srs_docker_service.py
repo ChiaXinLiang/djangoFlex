@@ -62,19 +62,22 @@ class SRSDockerService(BaseDockerService):
         if not self.check_docker_availability():
             return False, "Docker is not available"
         
+        if self.config.container_name is None:
+            return False, "Container name is not set in the configuration"
+        
         try:
             status, message = self.get_container_status()
             if status == 'running':
-                subprocess.run(['docker', 'stop', self.container_name], check=True)
-                subprocess.run(['docker', 'rm', self.container_name], check=True)
-                return True, f"Docker SRS server '{self.container_name}' stopped and removed"
+                subprocess.run(['docker', 'stop', self.config.container_name], check=True)
+                subprocess.run(['docker', 'rm', self.config.container_name], check=True)
+                return True, f"Docker SRS server '{self.config.container_name}' stopped and removed"
             elif status == 'exited':
-                subprocess.run(['docker', 'rm', self.container_name], check=True)
-                return True, f"Docker SRS server '{self.container_name}' was already stopped, container removed"
+                subprocess.run(['docker', 'rm', self.config.container_name], check=True)
+                return True, f"Docker SRS server '{self.config.container_name}' was already stopped, container removed"
             elif status is None:
                 return False, message
             else:
-                return False, f"Docker SRS server '{self.container_name}' is in an unexpected state: {status}"
+                return False, f"Docker SRS server '{self.config.container_name}' is in an unexpected state: {status}"
         except subprocess.CalledProcessError as e:
             return False, f"Error stopping Docker SRS server: {str(e)}"
         except Exception as e:
