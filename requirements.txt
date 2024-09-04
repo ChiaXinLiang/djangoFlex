@@ -16,3 +16,6 @@ daphne==4.1.2
 uvicorn==0.30.6
 channels
 aiohttp==3.10.5
+mysqlclient
+mysql
+mysql-connector-python

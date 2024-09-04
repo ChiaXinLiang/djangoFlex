@@ -14,6 +14,8 @@ def stream_to_rtmp(rtmp_url, source_video):
         "-stream_loop", "-1",  # This will repeat 100 times (original + 99 loops)
         "-i", source_video,
         "-c", "copy",
+        "-vcodec", "libx264",
+        "-preset:v", "ultrafast",
         "-f", "flv",
         rtmp_url
     ]
@@ -44,7 +46,7 @@ def stream_to_rtmp(rtmp_url, source_video):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Stream video to RTMP server')
     parser.add_argument('--rtmp', default="rtmp://localhost/live/livestream", help='RTMP URL')
-    parser.add_argument('--source', default="C:/App/djangoFlex/test/video/0641.mp4", help='Source video file')
+    parser.add_argument('--source', default="C:/App/djangoFlex/test/video/outpu6.mp4", help='Source video file')
     args = parser.parse_args()
 
     stream_to_rtmp(args.rtmp, args.source)

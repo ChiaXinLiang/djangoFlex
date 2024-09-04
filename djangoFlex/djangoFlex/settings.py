@@ -50,6 +50,8 @@ INSTALLED_APPS = [
     'djangoFlex_servers.mlflow_server',  # New MLflow server app
     'djangoFlex_servers.srs_server',  # New SRS server app
     'djangoFlex_servers.videoCap_server',  # New VideoCap server app
+    'djangoFlex_servers.visionAI_server',
+    'djangoFlex_servers.redis_server', 
     # 'clients.rabbitmq_client',
     'channels',
     # 'socketio',
@@ -90,11 +92,22 @@ WSGI_APPLICATION = "djangoFlex.wsgi.application"
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': os.getenv('MYSQL_DATABASE', 'your_database_name'),
+#         'USER': os.getenv('MYSQL_ROOT_USER', 'root'),
+#         'PASSWORD': os.getenv('MYSQL_ROOT_PASSWORD', 'your_mysql_password'),
+#         'HOST': os.getenv('MYSQL_SERVER_HOST', 'localhost'),
+#         'PORT': os.getenv('MYSQL_SERVER_PORT', '3306'),
+#     }
+# }
 
 
 # Password validation
@@ -167,6 +180,7 @@ CHANNEL_LAYERS = {
 }
 
 
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -189,17 +203,5 @@ LOGGING = {
     'root': {
         'handlers': ['console'],
         'level': 'DEBUG',
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'django.db.backends': {
-            'handlers': ['console'],
-            'level': 'INFO',  # Set to INFO to suppress SQL query logs
-            'propagate': False,
-        },
     },
 }
