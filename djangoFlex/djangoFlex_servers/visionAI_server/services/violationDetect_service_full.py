@@ -13,10 +13,6 @@ import redis
 import random
 import numpy as np
 import time
-import json
-import pika
-from django.core.serializers.json import DjangoJSONEncoder
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -153,87 +149,7 @@ class ViolationDetectService:
         # Check for violations
         self._check_violations(detected_objects, scene, key_frame)
 
-        # Generate the JSON message
-        message = {
-            "key_frame_id": key_frame.frame_id,
-            "frame_time": key_frame.frame_time.isoformat(),
-            "frame_index": key_frame.frame_index,
-            "scenes": [
-                {
-                    "class": scene.scene_type.type_name,
-                    "description": scene.description
-                }
-            ],
-            "object_detected": self._format_detected_objects(key_frame),
-            "violations": self._format_violations(key_frame)
-        }
-
-        # Publish the message to RabbitMQ
-        # Check if any violation has severity > 3
-        high_severity_violations = [v for v in key_frame.violation_set.all() if v.rule.severity_level < 3]
-        
-        if high_severity_violations:
-            self._publish_to_rabbitmq(message)
-        else:
-            logger.info("No high severity violations detected, skipping RabbitMQ publish")
-
-        logger.info(f"Processed frame for {rtmp_url} and published to RabbitMQ")
-
-    def _format_detected_objects(self, key_frame):
-        formatted_objects = {}
-        for obj in key_frame.detectedobject_set.all():
-            if obj.entity_type.type_name not in formatted_objects:
-                formatted_objects[obj.entity_type.type_name] = {
-                    "entity_type": obj.entity_type.type_name,
-                    "object_details": []
-                }
-            formatted_objects[obj.entity_type.type_name]["object_details"].append({
-                "object_id": obj.detected_object_id,
-                "object_class": obj.specific_type,
-                "confidence_score": obj.confidence_score,
-                "bounding_box": obj.bounding_box,
-                "segmentation": obj.segmentation,
-                "re_id": obj.re_id
-            })
-        return list(formatted_objects.values())
-
-    def _format_violations(self, key_frame):
-        return [
-            {
-                "violation_id": v.violation_id,
-                "violation_type": {
-                    "violation_code": v.rule.rule_code,
-                    "violation_description": v.rule.description,
-                    "severity_level": v.rule.severity_level
-                },
-                "entity_type": v.detected_object.entity_type.type_name if v.detected_object else "Scene",
-                "entity_id": v.detected_object.detected_object_id if v.detected_object else v.scene.scene_id,
-                "occurrence_time": v.occurrence_time.isoformat()
-            }
-            for v in key_frame.violation_set.all()
-        ]
-
-    def _publish_to_rabbitmq(self, message):
-        try:
-            credentials = pika.PlainCredentials(settings.SERVERS_CONFIG['RABBITMQ_USER'], settings.SERVERS_CONFIG['RABBITMQ_PASSWORD'])
-            parameters = pika.ConnectionParameters(
-                host=settings.SERVERS_CONFIG['RABBITMQ_HOST'],
-                port=settings.SERVERS_CONFIG['RABBITMQ_PORT'],
-                virtual_host=settings.SERVERS_CONFIG['RABBITMQ_VHOST'],
-                credentials=credentials
-            )
-            connection = pika.BlockingConnection(parameters)
-            channel = connection.channel()
-            channel.queue_declare(queue='vision_ai_results')
-            channel.basic_publish(
-                exchange='',
-                routing_key='vision_ai_results',
-                body=json.dumps(message)
-            )
-            connection.close()
-            logger.info("Message published to RabbitMQ successfully")
-        except Exception as e:
-            logger.error(f"Failed to publish message to RabbitMQ: {str(e)}")
+        logger.info(f"Processed frame for {rtmp_url}")
 
     def _detect_objects(self, frame, key_frame):
         # Simulate object detection

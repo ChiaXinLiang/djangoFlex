@@ -4,6 +4,7 @@ from django.utils import timezone
 
 class KeyFrame(models.Model):
     frame_id = models.AutoField(primary_key=True)
+    rtmp_url = models.URLField(null=True, blank=True)
     frame_time = models.DateTimeField()
     frame_index = models.IntegerField()
 

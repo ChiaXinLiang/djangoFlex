@@ -3,8 +3,9 @@ from .models import KeyFrame, EntityType, DetectedObject, Role, PersonRole, Scen
 
 @admin.register(KeyFrame)
 class KeyFrameAdmin(admin.ModelAdmin):
-    list_display = ('frame_id', 'frame_time', 'frame_index')
-    search_fields = ('frame_id', 'frame_time')
+    list_display = ('frame_id', 'frame_time', 'frame_index', 'rtmp_url')
+    search_fields = ('frame_id', 'frame_time', 'rtmp_url')
+    list_filter = ('rtmp_url',)
     actions = ['delete_selected']
 
 @admin.register(EntityType)
@@ -15,10 +16,18 @@ class EntityTypeAdmin(admin.ModelAdmin):
 
 @admin.register(DetectedObject)
 class DetectedObjectAdmin(admin.ModelAdmin):
-    list_display = ('detected_object_id', 'frame', 'parent_object', 'entity_type', 'specific_type', 'confidence_score', 're_id')
-    list_filter = ('entity_type', 'specific_type', 'parent_object')
-    search_fields = ('specific_type', 're_id', 'parent_object__detected_object_id')
+    list_display = ('detected_object_id', 'frame', 'parent_object', 'entity_type', 'specific_type', 'confidence_score', 're_id', 'frame_time', 'rtmp_url')
+    list_filter = ('entity_type', 'specific_type', 'parent_object', 'frame__rtmp_url')
+    search_fields = ('specific_type', 're_id', 'parent_object__detected_object_id', 'frame__rtmp_url')
     actions = ['delete_selected']
+
+    def frame_time(self, obj):
+        return obj.frame.frame_time if obj.frame else "N/A"
+    frame_time.short_description = 'Frame Time'
+
+    def rtmp_url(self, obj):
+        return obj.frame.rtmp_url if obj.frame else "N/A"
+    rtmp_url.short_description = 'RTMP URL'
 
 @admin.register(Role)
 class RoleAdmin(admin.ModelAdmin):
@@ -28,9 +37,18 @@ class RoleAdmin(admin.ModelAdmin):
 
 @admin.register(PersonRole)
 class PersonRoleAdmin(admin.ModelAdmin):
-    list_display = ('person_role_id', 'detected_object', 'role')
-    list_filter = ('role',)
+    list_display = ('person_role_id', 'detected_object', 'role', 'frame_time', 'rtmp_url')
+    list_filter = ('role', 'detected_object__frame__rtmp_url')
+    search_fields = ('detected_object__frame__rtmp_url',)
     actions = ['delete_selected']
+
+    def frame_time(self, obj):
+        return obj.detected_object.frame.frame_time if obj.detected_object and obj.detected_object.frame else "N/A"
+    frame_time.short_description = 'Frame Time'
+
+    def rtmp_url(self, obj):
+        return obj.detected_object.frame.rtmp_url if obj.detected_object and obj.detected_object.frame else "N/A"
+    rtmp_url.short_description = 'RTMP URL'
 
 @admin.register(SceneType)
 class SceneTypeAdmin(admin.ModelAdmin):
@@ -40,9 +58,18 @@ class SceneTypeAdmin(admin.ModelAdmin):
 
 @admin.register(Scene)
 class SceneAdmin(admin.ModelAdmin):
-    list_display = ('scene_id', 'frame', 'scene_type')
-    list_filter = ('scene_type',)
+    list_display = ('scene_id', 'frame', 'scene_type', 'frame_time', 'rtmp_url')
+    list_filter = ('scene_type', 'frame__rtmp_url')
+    search_fields = ('frame__rtmp_url',)
     actions = ['delete_selected']
+
+    def frame_time(self, obj):
+        return obj.frame.frame_time if obj.frame else "N/A"
+    frame_time.short_description = 'Frame Time'
+
+    def rtmp_url(self, obj):
+        return obj.frame.rtmp_url if obj.frame else "N/A"
+    rtmp_url.short_description = 'RTMP URL'
 
 @admin.register(Rule)
 class RuleAdmin(admin.ModelAdmin):
@@ -53,10 +80,18 @@ class RuleAdmin(admin.ModelAdmin):
 
 @admin.register(Violation)
 class ViolationAdmin(admin.ModelAdmin):
-    list_display = ('violation_id', 'rule', 'frame', 'detected_object', 'scene', 'occurrence_time')
-    list_filter = ('rule', 'occurrence_time')
-    search_fields = ('rule__rule_code', 'detected_object__specific_type')
+    list_display = ('violation_id', 'rule', 'frame', 'detected_object', 'scene', 'occurrence_time', 'frame_time', 'rtmp_url')
+    list_filter = ('rule', 'occurrence_time', 'frame__rtmp_url')
+    search_fields = ('rule__rule_code', 'detected_object__specific_type', 'frame__rtmp_url')
     actions = ['delete_selected']
+
+    def frame_time(self, obj):
+        return obj.frame.frame_time if obj.frame else "N/A"
+    frame_time.short_description = 'Frame Time'
+
+    def rtmp_url(self, obj):
+        return obj.frame.rtmp_url if obj.frame else "N/A"
+    rtmp_url.short_description = 'RTMP URL'
 
 @admin.register(VisionAIConfig)
 class VisionAIConfigAdmin(admin.ModelAdmin):

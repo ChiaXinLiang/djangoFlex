@@ -20,8 +20,12 @@ class CurrentFrameAdmin(admin.ModelAdmin):
             return obj.config.rtmp_url
         return "No config"
 
-    list_display = ('frame_preview', 'rtmp_url')
-    readonly_fields = ('frame_preview', 'rtmp_url')
+    def frame_time(self, obj):
+        return obj.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+    frame_time.short_description = 'Frame Time'
+
+    list_display = ('frame_preview', 'rtmp_url', 'frame_time')
+    readonly_fields = ('frame_preview', 'rtmp_url', 'frame_time')
 
 @admin.register(VideoCapConfig)
 class VideoCapConfigAdmin(admin.ModelAdmin):
