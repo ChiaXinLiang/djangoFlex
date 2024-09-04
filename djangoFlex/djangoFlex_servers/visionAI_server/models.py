@@ -15,8 +15,8 @@ class EntityType(models.Model):
 class DetectedObject(models.Model):
     detected_object_id = models.AutoField(primary_key=True)
     frame = models.ForeignKey(KeyFrame, on_delete=models.CASCADE)
-    parent_object = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL)
-    entity_type = models.ForeignKey(EntityType, on_delete=models.PROTECT)
+    parent_object = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE)
+    entity_type = models.ForeignKey(EntityType, on_delete=models.CASCADE)
     specific_type = models.CharField(max_length=100)
     confidence_score = models.FloatField()
     bounding_box = models.JSONField()  # Storing as JSON array
@@ -31,7 +31,7 @@ class Role(models.Model):
 class PersonRole(models.Model):
     person_role_id = models.AutoField(primary_key=True)
     detected_object = models.ForeignKey(DetectedObject, on_delete=models.CASCADE)
-    role = models.ForeignKey(Role, on_delete=models.PROTECT)
+    role = models.ForeignKey(Role, on_delete=models.CASCADE)
 
 class SceneType(models.Model):
     scene_type_id = models.AutoField(primary_key=True)
@@ -41,7 +41,7 @@ class SceneType(models.Model):
 class Scene(models.Model):
     scene_id = models.AutoField(primary_key=True)
     frame = models.ForeignKey(KeyFrame, on_delete=models.CASCADE)
-    scene_type = models.ForeignKey(SceneType, on_delete=models.PROTECT)
+    scene_type = models.ForeignKey(SceneType, on_delete=models.CASCADE)
     description = models.TextField()
 
 class Rule(models.Model):
@@ -53,10 +53,10 @@ class Rule(models.Model):
 
 class Violation(models.Model):
     violation_id = models.AutoField(primary_key=True)
-    rule = models.ForeignKey(Rule, on_delete=models.PROTECT)
+    rule = models.ForeignKey(Rule, on_delete=models.CASCADE)
     frame = models.ForeignKey(KeyFrame, on_delete=models.CASCADE)
-    detected_object = models.ForeignKey(DetectedObject, null=True, blank=True, on_delete=models.SET_NULL)
-    scene = models.ForeignKey(Scene, null=True, blank=True, on_delete=models.SET_NULL)
+    detected_object = models.ForeignKey(DetectedObject, null=True, blank=True, on_delete=models.CASCADE)
+    scene = models.ForeignKey(Scene, null=True, blank=True, on_delete=models.CASCADE)
     occurrence_time = models.DateTimeField(default=timezone.now)
 
 class VisionAIConfig(models.Model):

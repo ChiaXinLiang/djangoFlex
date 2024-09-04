@@ -47,6 +47,9 @@ MYSQL_DATA_DIR: "/path/to/mysql/data"
 
 # VisionAI Configuration
 VISIONAI_RULE_CONFIG_PATH: "djangoFlex_servers/visionAI_server/type_initial_config/rule.yaml"
+VISIONAI_ROLE_CONFIG_PATH: "djangoFlex_servers/visionAI_server/type_initial_config/role.yaml"
+VISIONAI_ENTITY_TYPE_CONFIG_PATH: "djangoFlex_servers/visionAI_server/type_initial_config/entity_type.yaml"
+VISIONAI_SCENE_TYPE_CONFIG_PATH: "djangoFlex_servers/visionAI_server/type_initial_config/scene_type.yaml"
 
 # Redis Server Configuration
 REDIS_SERVER_HOST: "localhost"

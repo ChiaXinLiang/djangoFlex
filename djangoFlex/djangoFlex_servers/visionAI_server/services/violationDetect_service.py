@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from django.db import transaction
 from django.utils import timezone
 from djangoFlex_servers.videoCap_server.models import VideoCapConfig    
-from ..models import  Rule, Violation, DetectedObject, Scene, KeyFrame
+from ..models import Rule, Violation, DetectedObject, Scene, KeyFrame, EntityType, SceneType, Role, PersonRole
 from django.conf import settings
 import redis
 import random
@@ -21,10 +21,13 @@ class ViolationDetectService:
         self.rules = {}
         self.running = {}
         self.detect_threads = {}
-        self.executor = ThreadPoolExecutor(max_workers=10)
+        self.executor = None
         self.redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
         self._load_configs()
         self._load_rules()
+        self._load_entity_types()
+        self._load_scene_types()
+        self._load_roles()
         logger.info("ViolationDetectService initialized")
 
     def _load_configs(self):
@@ -38,22 +41,35 @@ class ViolationDetectService:
 
     def _load_rules(self):
         try:
-            db_rules = Rule.objects.all()
-            if db_rules.exists():
-                for rule in db_rules:
-                    self.rules[rule.rule_code] = rule
-            else:
-                with open(settings.BASE_DIR / 'rule.yaml', 'r') as file:
-                    yaml_rules = yaml.safe_load(file)
-                    for rule_data in yaml_rules:
-                        rule = Rule.objects.create(**rule_data)
-                        self.rules[rule.rule_code] = rule
+            self.rules = {rule.rule_code: rule for rule in Rule.objects.all()}
             logger.info("Rules loaded successfully")
         except Exception as e:
             logger.error(f"Error loading rules: {str(e)}")
 
+    def _load_entity_types(self):
+        try:
+            self.entity_types = {et.type_name: et for et in EntityType.objects.all()}
+            logger.info("Entity types loaded successfully")
+        except Exception as e:
+            logger.error(f"Error loading entity types: {str(e)}")
+
+    def _load_scene_types(self):
+        try:
+            self.scene_types = {st.type_name: st for st in SceneType.objects.all()}
+            logger.info("Scene types loaded successfully")
+        except Exception as e:
+            logger.error(f"Error loading scene types: {str(e)}")
+
+    def _load_roles(self):
+        try:
+            self.roles = {r.role_name: r for r in Role.objects.all()}
+            logger.info("Roles loaded successfully")
+        except Exception as e:
+            logger.error(f"Error loading roles: {str(e)}")
+
     def start_service(self):
         logger.info("Starting ViolationDetectService")
+        self.executor = ThreadPoolExecutor(max_workers=10)
         for rtmp_url in self.configs.keys():
             self.start_detection(rtmp_url)
         logger.info("ViolationDetectService started successfully")
@@ -63,7 +79,9 @@ class ViolationDetectService:
         for rtmp_url in list(self.running.keys()):
             if self.running[rtmp_url]:
                 self.stop_detection(rtmp_url)
-        self.executor.shutdown(wait=True)
+        if self.executor:
+            self.executor.shutdown(wait=True)
+            self.executor = None
         logger.info("ThreadPoolExecutor shut down")
         logger.info("ViolationDetectService stopped successfully")
 
@@ -78,6 +96,8 @@ class ViolationDetectService:
             return False, "No configuration found"
 
         self.running[rtmp_url] = True
+        if self.executor is None or self.executor._shutdown:
+            self.executor = ThreadPoolExecutor(max_workers=10)
         self.detect_threads[rtmp_url] = self.executor.submit(self._detect_loop, rtmp_url)
 
         logger.info(f"Detection started for {rtmp_url}")
@@ -108,43 +128,73 @@ class ViolationDetectService:
         logger.info(f"Detection loop ended for {rtmp_url}")
 
     def _process_frame(self, rtmp_url, frame):
-        # Here we implement a simplified violation detection logic
-        # that randomly selects a rule and creates a violation
         config = self.configs[rtmp_url]
         
         # Create a KeyFrame
         key_frame = KeyFrame.objects.create(
             frame_time=timezone.now(),
-            frame_index=0  # You might want to implement a frame counter
+            frame_index=0  # Implement a frame counter
         )
 
-        # Randomly select a rule
-        if self.rules:
-            random_rule = random.choice(list(self.rules.values()))
+        # Perform object detection (simulated for this example)
+        detected_objects = self._detect_objects(frame, key_frame)
 
-            # Create a violation with the random rule
-            Violation.objects.create(
-                rule=random_rule,
+        # Perform scene analysis (simulated)
+        scene = self._analyze_scene(frame, key_frame)
+
+        # Check for violations
+        self._check_violations(detected_objects, scene, key_frame)
+
+        logger.info(f"Processed frame for {rtmp_url}")
+
+    def _detect_objects(self, frame, key_frame):
+        # Simulate object detection
+        # In a real implementation, you would use a pre-trained model or API
+        detected_objects = []
+        for _ in range(random.randint(1, 5)):
+            object_type = random.choice(list(self.entity_types.values()))
+            detected_objects.append(DetectedObject.objects.create(
                 frame=key_frame,
-                detected_object=None,  # We're not detecting objects in this simplified version
-                scene=None  # We're not detecting scenes in this simplified version
-            )
+                entity_type=object_type,
+                specific_type=object_type.type_name,
+                confidence_score=random.uniform(0.7, 1.0),
+                bounding_box={'x': random.randint(0, 100), 'y': random.randint(0, 100), 'width': random.randint(10, 50), 'height': random.randint(10, 50)},
+                segmentation=[],  # Add segmentation data if available
+                re_id=random.randint(1, 1000)
+            ))
+        return detected_objects
 
-            logger.info(f"Created violation for rule: {random_rule.rule_code}")
-        else:
-            logger.warning("No rules available to create violations")
+    def _analyze_scene(self, frame, key_frame):
+        # Simulate scene analysis
+        scene_type = random.choice(list(self.scene_types.values()))
+        return Scene.objects.create(
+            frame=key_frame,
+            scene_type=scene_type,
+            description=f"Detected {scene_type.type_name}"
+        )
 
-    def _detect_objects(self, frame):
-        # Placeholder for object detection
-        return []
+    def _check_violations(self, detected_objects, scene, key_frame):
+        for rule in self.rules.values():
+            # Simplified violation detection logic
+            if random.random() < 0.1:  # 10% chance of violation for demonstration
+                violated_object = random.choice(detected_objects) if detected_objects else None
+                Violation.objects.create(
+                    rule=rule,
+                    frame=key_frame,
+                    detected_object=violated_object,
+                    scene=scene,
+                    occurrence_time=timezone.now()
+                )
+                logger.info(f"Violation detected for rule: {rule.rule_code}")
 
-    def _detect_scene(self, frame):
-        # Placeholder for scene detection
-        return None
-
-    def _check_violation(self, rule, detected_objects, scene):
-        # Placeholder for violation checking
-        return False
+                # Assign roles to detected objects (if applicable)
+                if violated_object:
+                    role = random.choice(list(self.roles.values()))
+                    PersonRole.objects.create(
+                        detected_object=violated_object,
+                        role=role
+                    )
+                    logger.info(f"Assigned role {role.role_name} to detected object")
 
     def update_rules(self):
         self._load_rules()
@@ -166,7 +216,7 @@ class ViolationDetectService:
 
     def __del__(self):
         logger.info("ViolationDetectService destructor called")
-        self.stop_server()
+        self.stop_service()
         logger.info("ViolationDetectService destroyed")
 
     def list_running_threads(self):
@@ -175,6 +225,6 @@ class ViolationDetectService:
             running_threads.append({
                 'rtmp_url': rtmp_url,
                 'is_running': self.running[rtmp_url],
-                'is_done': future.done()
+                'is_done': future.done() if future else True
             })
         return running_threads
