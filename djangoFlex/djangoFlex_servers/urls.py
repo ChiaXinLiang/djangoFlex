@@ -8,4 +8,5 @@ urlpatterns = [
     path('mysqp_server/', include('djangoFlex_servers.mysqp_server.urls')),
     path('redis_server/', include('djangoFlex_servers.redis_server.urls')),
     path('visionAI_server/', include('djangoFlex_servers.visionAI_server.urls')),
+    path('postgres_server/', include('djangoFlex_servers.postgres_server.urls')),
 ]

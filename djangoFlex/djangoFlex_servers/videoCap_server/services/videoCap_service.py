@@ -2,48 +2,58 @@ import cv2
 import time
 import threading
 import logging
-from concurrent.futures import ThreadPoolExecutor
+from ..models import VideoCapConfig, CurrentFrame
 from django.db import transaction
 from django.utils import timezone
-from ..models import VideoCapConfig, CurrentFrame
-from django.conf import settings
 import redis
 
 logger = logging.getLogger(__name__)
 
 class VideoCapService:
     def __init__(self):
+        
         self.configs = {}
         self.caps = {}
         self.running = {}
         self.capture_threads = {}
-        self.executor = ThreadPoolExecutor(max_workers=10)
         self.max_reconnect_attempts = 5
         self.reconnect_timeout = 5 
         self.redis_client = redis.StrictRedis(host='localhost', port='6379', db=0)
         self._load_configs()
         logger.info("VideoCapService initialized")
 
+    @staticmethod
+    @transaction.atomic
+    def reset_video_cap_system():
+        from ..models import VideoCapConfig, CurrentFrame
+        try:
+            CurrentFrame.objects.all().delete()
+            VideoCapConfig.objects.update(is_active=False)
+            redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
+            for key in redis_client.keys("video_cap_service:current_image:*"):
+                redis_client.delete(key)
+            logger.info("Video capture system reset completed")
+        except Exception as e:
+            logger.error(f"Error resetting video capture system: {str(e)}")
+
+
     def _load_configs(self):
         try:
             for config in VideoCapConfig.objects.filter(is_active=True):
                 self.configs[config.rtmp_url] = config
                 self.running[config.rtmp_url] = False
-                self.start_server(config.rtmp_url)
             logger.info("Configurations loaded successfully")
         except Exception as e:
             logger.error(f"Error loading configurations: {str(e)}")
 
     def start_server(self, rtmp_url):
         if rtmp_url in self.running and self.running[rtmp_url]:
-            logger.info(f"Server for {rtmp_url} is already running")
             return False, "Server already running"
 
         config, created = VideoCapConfig.objects.get_or_create(rtmp_url=rtmp_url)
         if created:
             config.name = f"Config_{config.id}"
             config.save()
-            logger.info(f"New configuration created for {rtmp_url}")
 
         self.configs[rtmp_url] = config
         self.running[rtmp_url] = True
@@ -59,49 +69,41 @@ class VideoCapService:
 
     def stop_server(self, rtmp_url):
         if rtmp_url not in self.running or not self.running[rtmp_url]:
-            logger.warning(f"Server for {rtmp_url} is not running")
             return False, "Server not running"
 
         self.running[rtmp_url] = False
         if rtmp_url in self.capture_threads:
             self.capture_threads[rtmp_url].join()
             del self.capture_threads[rtmp_url]
-            logger.info(f"Capture thread for {rtmp_url} stopped")
 
         if rtmp_url in self.caps:
             self.caps[rtmp_url].release()
             del self.caps[rtmp_url]
-            logger.info(f"Video capture for {rtmp_url} released")
 
         with transaction.atomic():
             config = self.configs[rtmp_url]
             config.is_active = False
             config.save()
-            CurrentFrame.objects.filter(config=config).delete()
-            logger.info(f"Configuration for {rtmp_url} deactivated and current frames deleted")
+            self.cleanup_old_frames(rtmp_url)
 
-        self.redis_client.delete(f"video_cap_service:current_image:{rtmp_url}")  # Delete the redis_client key
+        self.redis_client.delete(f"video_cap_service:current_image:{rtmp_url}")
         logger.info(f"Server stopped for {rtmp_url}")
         return True, "Server stopped successfully"
 
     def check_server_status(self, rtmp_url):
         status = self.running.get(rtmp_url, False)
-        logger.info(f"Server status for {rtmp_url}: {'Running' if status else 'Not running'}")
         return status
 
     def _initialize_capture(self, rtmp_url):
         if rtmp_url in self.caps and self.caps[rtmp_url] is not None:
             self.caps[rtmp_url].release()
-            logger.info(f"Existing capture for {rtmp_url} released")
         
-        # Handle '0' as a special case for local camera
         cap_source = 0 if rtmp_url == '0' else rtmp_url
         try:
             self.caps[rtmp_url] = cv2.VideoCapture(cap_source)
             self.caps[rtmp_url].set(cv2.CAP_PROP_BUFFERSIZE, 1)
             if not self.caps[rtmp_url].isOpened():
                 raise Exception("Failed to open video capture")
-            logger.info(f"Video capture initialized for {rtmp_url}")
         except Exception as e:
             logger.error(f"Failed to initialize video capture for {rtmp_url}: {str(e)}")
             self.caps[rtmp_url] = None
@@ -110,7 +112,6 @@ class VideoCapService:
         config = self.configs[rtmp_url]
         reconnect_start_time = None
         reconnect_attempts = 0
-        logger.info(f"Capture loop started for {rtmp_url}")
         while self.running[rtmp_url]:
             if rtmp_url in self.caps and self.caps[rtmp_url] is not None and self.caps[rtmp_url].isOpened():
                 if self._process_frame(rtmp_url):
@@ -124,23 +125,19 @@ class VideoCapService:
                 if reconnect_start_time is None:
                     reconnect_start_time = time.time()
                     reconnect_attempts += 1
-                    logger.warning(f"Connection lost for {rtmp_url}, attempting to reconnect")
             
             if reconnect_start_time is not None:
                 elapsed_time = time.time() - reconnect_start_time
                 if elapsed_time > self.reconnect_timeout or reconnect_attempts > self.max_reconnect_attempts:
-                    logger.error(f"Failed to reconnect to {rtmp_url} after {elapsed_time:.2f} seconds and {reconnect_attempts} attempts. Setting server to inactive.")
                     self._set_inactive(rtmp_url)
                     break
                 else:
                     self._reconnect(rtmp_url)
             
             time.sleep(config.frame_interval)
-        logger.info(f"Capture loop ended for {rtmp_url}")
 
     def _process_frame(self, rtmp_url):
         if rtmp_url not in self.caps or self.caps[rtmp_url] is None or not self.caps[rtmp_url].isOpened():
-            logger.warning(f"VideoCapture is not initialized or opened for {rtmp_url}")
             return False
 
         try:
@@ -149,53 +146,42 @@ class VideoCapService:
                 raise Exception("Failed to capture frame")
             
             self.update_frame(rtmp_url, frame)
-            self.configs[rtmp_url].consecutive_errors = 0  # Reset error count on success
-            # logger.debug(f"Frame processed successfully for {rtmp_url}")
+            self.configs[rtmp_url].max_consecutive_errors = 0
             return True
         except Exception as e:
-            logger.warning(f"Error processing frame for {rtmp_url}: {str(e)}")
-            self.configs[rtmp_url].consecutive_errors += 1
+            self.configs[rtmp_url].max_consecutive_errors += 1
             return False
 
     def _reconnect(self, rtmp_url):
-        logger.info(f"Attempting to reconnect to video source for {rtmp_url}")
         if rtmp_url in self.caps and self.caps[rtmp_url] is not None:
             self.caps[rtmp_url].release()
         self.caps[rtmp_url] = None
-        time.sleep(1)  # Wait a bit before reconnecting
+        time.sleep(1)
         if self.caps[rtmp_url] is None or not self.caps[rtmp_url].isOpened():
-            logger.error(f"Failed to reconnect to video source for {rtmp_url}")
             return False
         else:
-            logger.info(f"Successfully reconnected to video source for {rtmp_url}")
-            self.configs[rtmp_url].consecutive_errors = 0
+            self.configs[rtmp_url].max_consecutive_errors = 0
             return True
 
     def _set_inactive(self, rtmp_url):
-        logger.info(f"Setting server to inactive for {rtmp_url}")
         with transaction.atomic():
             config = self.configs[rtmp_url]
             config.is_active = False
             config.save()
             CurrentFrame.objects.filter(config=config).delete()
-            logger.info(f"Configuration for {rtmp_url} set to inactive and current frames deleted")
 
         self.running[rtmp_url] = False
         if rtmp_url in self.caps and self.caps[rtmp_url] is not None:
             self.caps[rtmp_url].release()
         self.caps[rtmp_url] = None
-        logger.info(f"Video capture for {rtmp_url} released")
 
         if rtmp_url in self.capture_threads:
             del self.capture_threads[rtmp_url]
-            logger.info(f"Capture thread for {rtmp_url} removed")
 
-        self.redis_client.delete(f"video_cap_service:current_image:{rtmp_url}")  # Delete the redis_client key
-        logger.info(f"Server set to inactive for {rtmp_url}")
+        self.redis_client.delete(f"video_cap_service:current_image:{rtmp_url}")
 
     def update_frame(self, rtmp_url, frame):
         if frame is None:
-            logger.warning(f"Received None frame for {rtmp_url}, skipping update")
             return
         
         _, buffer = cv2.imencode('.jpg', frame)
@@ -203,28 +189,29 @@ class VideoCapService:
         
         with transaction.atomic():
             config = self.configs[rtmp_url]
-            current_frame, created = CurrentFrame.objects.get_or_create(config=config)
-            current_frame.frame_data = frame_bytes
-            current_frame.timestamp = timezone.now()
-            current_frame.save()
+            current_frame = CurrentFrame.objects.create(
+                config=config,
+                frame_data=frame_bytes,
+                timestamp=timezone.now()
+            )
             self.redis_client.set(f"video_cap_service:current_image:{rtmp_url}", frame_bytes)
-            # logger.debug(f"Frame updated for {rtmp_url}")
+
+    def cleanup_old_frames(self, rtmp_url, reference_timestamp=None):
+        config = self.configs[rtmp_url]
+        if reference_timestamp is None:
+            reference_timestamp = timezone.now()
+        CurrentFrame.objects.filter(config=config, timestamp__lt=reference_timestamp).delete()
 
     def __del__(self):
-        logger.info("VideoCapService destructor called")
         for rtmp_url in list(self.running.keys()):
             if self.running[rtmp_url]:
                 self.stop_server(rtmp_url)
-        self.executor.shutdown(wait=True)
-        logger.info("ThreadPoolExecutor shut down")
 
         with transaction.atomic():
             CurrentFrame.objects.filter(config__in=self.configs.values()).delete()
-            logger.info("All current frames deleted")
 
         for rtmp_url in self.configs.keys():
-            self.redis_client.delete(f"video_cap_service:current_image:{rtmp_url}")  # Delete the redis_client key
-        logger.info("All redis_client keys deleted")
+            self.redis_client.delete(f"video_cap_service:current_image:{rtmp_url}")
 
         logger.info("VideoCapService destroyed")
 

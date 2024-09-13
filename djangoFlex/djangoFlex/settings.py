@@ -12,16 +12,17 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 import os
-from dotenv import load_dotenv
 import sys
+from dotenv import load_dotenv
 from djangoFlex.config.load_config_from_yaml import load_config_from_yaml
-
-# Add the parent directory to sys.path
-load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load environment variables and configuration
+load_dotenv()
+servers_config = load_config_from_yaml(BASE_DIR / 'djangoFlex' / 'config' / 'servers.yaml')
+SERVERS_CONFIG = servers_config
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
@@ -34,7 +35,6 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
 
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -46,14 +46,15 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "drf_yasg",
-    'djangoFlex_servers.rabbitmq_server',  # Updated path
-    'djangoFlex_servers.mlflow_server',  # New MLflow server app
-    'djangoFlex_servers.srs_server',  # New SRS server app
-    'djangoFlex_servers.videoCap_server',  # New VideoCap server app
+    'channels',
+    'djangoFlex_servers.rabbitmq_server',
+    'djangoFlex_servers.mlflow_server',
+    'djangoFlex_servers.srs_server',
+    'djangoFlex_servers.videoCap_server',
     'djangoFlex_servers.visionAI_server',
     'djangoFlex_servers.redis_server', 
+    'djangoFlex_servers.postgres_server',
     # 'clients.rabbitmq_client',
-    'channels',
     # 'socketio',
 ]
 
@@ -86,18 +87,23 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "djangoFlex.wsgi.application"
-
+ASGI_APPLICATION = 'djangoFlex.routing.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': SERVERS_CONFIG['POSTGRES_DATABASE'],
+        'USER': SERVERS_CONFIG['POSTGRES_ROOT_USER'],
+        'PASSWORD': SERVERS_CONFIG['POSTGRES_ROOT_PASSWORD'],
+        'HOST': SERVERS_CONFIG['POSTGRES_SERVER_HOST'],
+        'PORT': SERVERS_CONFIG['POSTGRES_SERVER_PORT'],
     }
 }
 
+# Uncomment and modify if using MySQL
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.mysql',
@@ -108,7 +114,6 @@ DATABASES = {
 #         'PORT': os.getenv('MYSQL_SERVER_PORT', '3306'),
 #     }
 # }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
@@ -128,18 +133,13 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_TZ = True
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
@@ -151,7 +151,7 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-
+# Swagger settings
 SWAGGER_SETTINGS = {
     'USE_SESSION_AUTH': False,
     'SECURITY_DEFINITIONS': {
@@ -161,26 +161,14 @@ SWAGGER_SETTINGS = {
     },
 }
 
-# Add this new setting
-
-# Update the ROOT_URLCONF if you haven't already
-ROOT_URLCONF = 'djangoFlex.urls'
-
-# MLflow settings
-
-# Load test configuration
-servers_config = load_config_from_yaml(BASE_DIR / 'djangoFlex' / 'config' / 'servers.yaml')
-SERVERS_CONFIG = servers_config
-
-ASGI_APPLICATION = 'djangoFlex.routing.application'
+# Channels configuration
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels.layers.InMemoryChannelLayer'
     }
 }
 
-
-
+# Logging configuration
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

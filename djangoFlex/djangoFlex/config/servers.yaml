@@ -58,3 +58,12 @@ REDIS_DOCKER_IMAGE: "redis:6.2.4"
 REDIS_DOCKER_CONTAINER_NAME: "redis_container"
 REDIS_DATA_DIR: "/path/to/redis/data"
 
+# PostgreSQL Configuration
+POSTGRES_SERVER_HOST: "localhost"
+POSTGRES_SERVER_PORT: 5432
+POSTGRES_ROOT_USER: "postgres"
+POSTGRES_ROOT_PASSWORD: "your_postgres_password"
+POSTGRES_DATABASE: "your_postgres_database"
+POSTGRES_DOCKER_IMAGE: "postgres:13"
+POSTGRES_DOCKER_CONTAINER_NAME: "postgres_container"
+POSTGRES_DATA_DIR: "/path/to/postgres/data"

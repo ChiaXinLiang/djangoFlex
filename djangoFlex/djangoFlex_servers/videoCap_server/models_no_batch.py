@@ -19,19 +19,18 @@ class VideoCapConfig(models.Model):
         return f"VideoCapConfig: {self.name}, RTMP URL={self.rtmp_url}, Active={self.is_active}"
 
 class CurrentFrame(models.Model):
-    config = models.ForeignKey(VideoCapConfig, on_delete=models.CASCADE, related_name='frames')
+    config = models.OneToOneField(VideoCapConfig, on_delete=models.CASCADE, related_name='current_frame')
     frame_data = models.BinaryField(blank=True, null=True)
     timestamp = models.DateTimeField(default=timezone.now)
 
     class Meta:
-        verbose_name = "Frame"
-        verbose_name_plural = "Frames"
-        ordering = ['-timestamp']
+        verbose_name = "Current Frame"
+        verbose_name_plural = "Current Frames"
 
     def __str__(self):
-        return f"Frame for {self.config.rtmp_url} at {self.timestamp}"
+        return f"Current frame for {self.config.rtmp_url} at {self.timestamp}"
 
     def save(self, *args, **kwargs):
-        self.timestamp = timezone.now()
+        self.timestamp = timezone.now()  # Update timestamp manually
         super().save(*args, **kwargs)
         # Save the frame data to Redis server

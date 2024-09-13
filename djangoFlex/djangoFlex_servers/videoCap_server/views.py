@@ -22,10 +22,10 @@ class VideoCapServerView(APIView):
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                'action': openapi.Schema(type=openapi.TYPE_STRING, enum=['start', 'stop', 'status'], description="The action to be performed."),
+                'action': openapi.Schema(type=openapi.TYPE_STRING, enum=['start', 'stop', 'status', 'start_all'], description="The action to be performed."),
                 'rtmp_url': openapi.Schema(type=openapi.TYPE_STRING, description="RTMP URL for the video capture"),
             },
-            required=['action', 'rtmp_url']
+            required=['action']
         ),
         responses={
             200: openapi.Response(
@@ -47,8 +47,11 @@ class VideoCapServerView(APIView):
         rtmp_url = request.data.get('rtmp_url')
         video_cap_service = self.get_video_cap_service()
 
-        if not rtmp_url:
-            return Response({"error": "RTMP URL is required"}, status=status.HTTP_400_BAD_REQUEST)
+        if action not in ['start', 'stop', 'status', 'start_all']:
+            return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if action != 'start_all' and not rtmp_url:
+            return Response({"error": "RTMP URL is required for this action"}, status=status.HTTP_400_BAD_REQUEST)
 
         if action == 'start':
             success, message = video_cap_service.start_server(rtmp_url)
@@ -59,8 +62,16 @@ class VideoCapServerView(APIView):
         elif action == 'status':
             is_running = video_cap_service.check_server_status(rtmp_url)
             message = f"Video capture server for {rtmp_url} is {'running' if is_running else 'not running'}"
-        else:
-            return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
+        elif action == 'start_all':
+            configs = VideoCapConfig.objects.all()
+            started_count = 0
+            for config in configs:
+                success, _ = video_cap_service.start_server(config.rtmp_url)
+                if success:
+                    started_count += 1
+            message = f"Started {started_count} out of {configs.count()} video capture servers"
+            is_running = started_count > 0
+            success = True
 
         return Response({"message": message, "is_running": is_running}, 
                         status=status.HTTP_200_OK if success else status.HTTP_500_INTERNAL_SERVER_ERROR)

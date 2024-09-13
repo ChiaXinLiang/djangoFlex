@@ -19,3 +19,4 @@ aiohttp==3.10.5
 mysqlclient
 mysql
 mysql-connector-python
+psycopg2

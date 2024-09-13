@@ -1,0 +1,111 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "title": "KEY_FRAME View",
+    "description": "Represents a key frame from a video with associated detected objects, violations, and scenes",
+    "properties": {
+      "frame_id": {
+        "type": "integer",
+        "description": "Unique identifier for the key frame"
+      },
+      "frame_time": {
+        "type": "string",
+        "format": "date-time",
+        "description": "Timestamp of the frame in the video"
+      },
+      "source_url": {
+        "type": "string",
+        "description": "URL source of the video"
+      },
+      "detected_objects": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "detected_object_id": {
+              "type": "integer"
+            },
+            "parent_object_id": {
+              "type": ["integer", "null"]
+            },
+            "entity_type": {
+              "type": "object",
+              "properties": {
+                "entity_type_id": { "type": "integer" },
+                "ENTITY_ENUM": { "type": "integer" },
+                "type_name": { "type": "string" },
+                "description": { "type": "string" }
+              }
+            },
+            "specific_type": { "type": "string" },
+            "confidence_score": { "type": "number" },
+            "bounding_box": {
+              "type": "array",
+              "items": { "type": "number" }
+            },
+            "segmentation": {
+              "type": "array",
+              "items": { "type": "number" }
+            },
+            "re_id": { "type": "integer" },
+            "person_role": {
+              "type": "object",
+              "properties": {
+                "person_role_id": { "type": "integer" },
+                "role": {
+                  "type": "object",
+                  "properties": {
+                    "role_id": { "type": "integer" },
+                    "ROLE_ENUM": { "type": "integer" },
+                    "role_name": { "type": "string" },
+                    "description": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "violations": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "violation_id": { "type": "integer" },
+            "rule": {
+              "type": "object",
+              "properties": {
+                "rule_id": { "type": "integer" },
+                "RULE_NUM": { "type": "integer" },
+                "rule_code": { "type": "string" },
+                "description": { "type": "string" },
+                "severity_level": { "type": "integer" },
+                "condition_logic": { "type": "string" }
+              }
+            },
+            "last_alert_time": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        }
+      },
+      "scene": {
+        "type": "object",
+        "properties": {
+          "scene_id": { "type": "integer" },
+          "scene_type": {
+            "type": "object",
+            "properties": {
+              "scene_type_id": { "type": "integer" },
+              "SCENE_ENUM": { "type": "integer" },
+              "type_name": { "type": "string" },
+              "description": { "type": "string" }
+            }
+          },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "required": ["frame_id", "video_id", "frame_time"]
+  }
