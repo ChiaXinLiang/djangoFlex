@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 import base64
 
-from .models import CurrentFrame, VideoCapConfig, CurrentVideoClip, AIInferenceResult
+from .models import CurrentFrame, VideoCapConfig
 
 @admin.register(CurrentFrame)
 class CurrentFrameAdmin(admin.ModelAdmin):
@@ -30,13 +30,3 @@ class CurrentFrameAdmin(admin.ModelAdmin):
 @admin.register(VideoCapConfig)
 class VideoCapConfigAdmin(admin.ModelAdmin):
     list_display = ('rtmp_url', 'frame_interval', 'max_consecutive_errors', 'is_active')
-
-@admin.register(CurrentVideoClip)
-class CurrentVideoClipAdmin(admin.ModelAdmin):
-    list_display = ('config', 'clip_path', 'start_time', 'end_time', 'duration', 'processed')
-    readonly_fields = ('duration',)
-
-@admin.register(AIInferenceResult)
-class AIInferenceResultAdmin(admin.ModelAdmin):
-    list_display = ('video_clip', 'timestamp')
-    readonly_fields = ('result_data',)
