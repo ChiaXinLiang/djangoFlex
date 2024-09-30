@@ -17,11 +17,11 @@ class DrawView(APIView):
         return cls.draw_result_service
 
     @method_decorator(name='post', decorator=swagger_auto_schema(
-        operation_description="Start all or stop the draw service for active RTMP URLs.",
+        operation_description="Start or stop the draw service for active RTMP URLs.",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                'action': openapi.Schema(type=openapi.TYPE_STRING, enum=['start_all', 'stop'], description="The action to be performed."),
+                'action': openapi.Schema(type=openapi.TYPE_STRING, enum=['start', 'stop'], description="The action to be performed."),
             },
             required=['action']
         ),
@@ -45,13 +45,13 @@ class DrawView(APIView):
         action = request.data.get('action')
         draw_result_service = self.get_draw_result_service()
 
-        if action not in ['start_all', 'stop']:
+        if action not in ['start', 'stop']:
             return Response({"success": False, "message": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
 
         active_configs = VideoCapConfig.objects.filter(is_active=True)
         affected_count = 0
 
-        if action == 'start_all':
+        if action == 'start':
             for config in active_configs:
                 rtmp_url = config.rtmp_url
                 success, message = draw_result_service.start_draw_service(rtmp_url)
@@ -59,8 +59,11 @@ class DrawView(APIView):
                     affected_count += 1
             action_verb = "Started"
         else:  # stop
-            DrawResultService.stop_all_services()
-            affected_count = active_configs.count()
+            for config in active_configs:
+                rtmp_url = config.rtmp_url
+                success, message = draw_result_service.stop_draw_service(rtmp_url)
+                if success:
+                    affected_count += 1
             action_verb = "Stopped"
 
         total_count = active_configs.count()
