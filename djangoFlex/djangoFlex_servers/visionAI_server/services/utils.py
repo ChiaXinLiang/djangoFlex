@@ -1,13 +1,10 @@
 import os
-import logging
 import mlflow
 from pathlib import Path
 import cv2
 import subprocess
 from ultralytics import YOLO
 import numpy as np
-
-logger = logging.getLogger(__name__)
 
 def check_path(path):
     """
@@ -21,7 +18,6 @@ def download_model_if_not_exists(model_name, model_version):
         model_download_path = f'models/{model_name}/{model_version}'
 
         if not os.path.exists(model_download_path):
-            logger.info(f"Model not found. Downloading model {model_name} version {model_version}")
             mlflow.set_tracking_uri("http://192.168.1.77:5000")
             client = mlflow.tracking.MlflowClient()
             model_version_details = client.get_model_version(name=model_name, version=model_version)
@@ -31,11 +27,7 @@ def download_model_if_not_exists(model_name, model_version):
 
             os.makedirs(model_download_path, exist_ok=True)
             client.download_artifacts(run_id, mlflow_model_path, dst_path=model_download_path)
-            logger.info(f"Model downloaded successfully to {model_download_path}")
-        else:
-            logger.info(f"Model already exists at {model_download_path}")
     except Exception as e:
-        logger.error(f"Error downloading model: {str(e)}")
         raise
 
 def load_detection_model(model_path):
@@ -44,14 +36,12 @@ def load_detection_model(model_path):
             raise FileNotFoundError(f"Model path '{model_path}' does not exist.")
         return YOLO(model_path)
     except Exception as e:
-        logger.error(f"Error loading detection model: {str(e)}")
         raise
 
 def create_ffmpeg_process(output_url, fps, frame_size):
     try:
         ffmpeg_command = [
             'ffmpeg',
-            '-re',
             '-f', 'rawvideo',
             '-vcodec', 'rawvideo',
             '-pix_fmt', 'bgr24',
@@ -61,8 +51,17 @@ def create_ffmpeg_process(output_url, fps, frame_size):
             '-c:v', 'libx264',
             '-pix_fmt', 'yuv420p',
             '-preset', 'ultrafast',
-            '-r', str(fps),
+            '-tune', 'zerolatency',
+            '-profile:v', 'baseline',
+            '-level', '3.0',
             '-f', 'flv',
+            '-max_muxing_queue_size', '1024',
+            '-g', '30',
+            '-keyint_min', '30',
+            '-sc_threshold', '0',
+            '-b:v', '2500k',
+            '-maxrate', '2500k',
+            '-bufsize', '5000k',
             output_url
         ]
         process = subprocess.Popen(ffmpeg_command, stdin=subprocess.PIPE)
@@ -72,7 +71,6 @@ def create_ffmpeg_process(output_url, fps, frame_size):
         
         return process, check_process
     except Exception as e:
-        logger.error(f"Error creating ffmpeg process: {str(e)}")
         raise
 
 def draw_bounding_boxes(frame, results, box_color, text_color, thickness, font, font_scale):
@@ -130,50 +128,36 @@ def run(weights, source, view_img=False, save_img=False):
     if save_img:
         output_path = os.path.join(save_dir, f"{Path(source).stem}_result.jpg")
         cv2.imwrite(output_path, processed_image)
-        logger.info(f"Result saved to {output_path}")
 
     return processed_image
 
 def draw_all_results(frames, first_result, last_result):
-    logger.info("Starting draw_all_results function")
     if not frames or not first_result or not last_result:
-        logger.warning("Empty input: frames, first_result, or last_result is missing")
         return frames
 
     num_frames = len(frames)
-    logger.info(f"Number of frames: {num_frames}")
     
-    # Extract detections from first and last results
     first_detections = [(int(box.xyxy[0][0]), int(box.xyxy[0][1]), int(box.xyxy[0][2]), int(box.xyxy[0][3])) 
                         for r in first_result for box in r.boxes]
     last_detections = [(int(box.xyxy[0][0]), int(box.xyxy[0][1]), int(box.xyxy[0][2]), int(box.xyxy[0][3])) 
                        for r in last_result for box in r.boxes]
 
-    logger.info(f"Number of detections in first frame: {len(first_detections)}")
-    logger.info(f"Number of detections in last frame: {len(last_detections)}")
-
-    interpolated_detections = interpolate_detections(last_detections, first_detections, num_frames - 2)
+    interpolated_detections = interpolate_detections(first_detections, last_detections, num_frames - 2)
 
     for i, frame in enumerate(frames):
-        logger.debug(f"Processing frame {i+1}/{num_frames}")
         if frame is None or frame.size == 0:
-            logger.error(f"Error decoding frame {i+1}: Empty or invalid frame")
             continue
 
         detections = first_detections if i == 0 else (last_detections if i == num_frames - 1 else interpolated_detections[i-1])
         
-        # Draw bounding boxes using draw_bounding_boxes function
         dummy_results = [type('DummyResult', (), {'boxes': type('DummyBoxes', (), {'xyxy': np.array([[x1, y1, x2, y2]]), 'cls': np.array([0])})()})() for x1, y1, x2, y2 in detections]
         frame = draw_bounding_boxes(frame, dummy_results, (0, 255, 0), (255, 255, 255), 2, cv2.FONT_HERSHEY_SIMPLEX, 0.6)
-        logger.debug(f"Drew {len(detections)} boxes on frame {i+1}")
 
         frames[i] = frame
     
-    logger.info("Finished processing all frames")
     return frames
 
 def calculate_iou(box1, box2):
-    # Calculate the Intersection over Union (IoU) of two bounding boxes
     x1 = max(box1[0], box2[0])
     y1 = max(box1[1], box2[1])
     x2 = min(box1[2], box2[2])
@@ -191,43 +175,41 @@ def calculate_distance(box1, box2):
     center2 = np.array([(box2[0] + box2[2]) / 2, (box2[1] + box2[3]) / 2])
     return np.linalg.norm(center1 - center2)
 
-def match_detections(last_detections, current_detections):
-    if not last_detections or not current_detections:
+def match_detections(first_detections, last_detections):
+    if not first_detections or not last_detections:
         return [], []
     
-    distances = [[calculate_distance(last, current) for current in current_detections] for last in last_detections]
+    distances = [[calculate_distance(first, last) for last in last_detections] for first in first_detections]
     matched_pairs = []
+    unmatched_first = list(range(len(first_detections)))
     unmatched_last = list(range(len(last_detections)))
-    unmatched_current = list(range(len(current_detections)))
     
-    while unmatched_last and unmatched_current:
-        i, j = min(((i, j) for i in unmatched_last for j in unmatched_current), key=lambda x: distances[x[0]][x[1]])
+    while unmatched_first and unmatched_last:
+        i, j = min(((i, j) for i in unmatched_first for j in unmatched_last), key=lambda x: distances[x[0]][x[1]])
         matched_pairs.append((i, j))
-        unmatched_last.remove(i)
-        unmatched_current.remove(j)
+        unmatched_first.remove(i)
+        unmatched_last.remove(j)
     
-    return matched_pairs, unmatched_current
+    return matched_pairs, unmatched_last
 
-def interpolate_detections(last_detections, current_detections, interval):
-    matched_pairs, unmatched_current = match_detections(last_detections, current_detections)
+def interpolate_detections(first_detections, last_detections, interval):
+    matched_pairs, unmatched_last = match_detections(first_detections, last_detections)
     
     interpolated = [[] for _ in range(interval)]
     
     for i, j in matched_pairs:
-        last = last_detections[i]
-        current = current_detections[j]
+        first = first_detections[i]
+        last = last_detections[j]
         for k in range(interval):
-            # 使用加權平均進行平滑插值
-            weight = (k + 1) / (interval + 1)  # 權重從 1/(interval+1) 到 interval/(interval+1)
-            x1 = int(last[0] * (1 - weight) + current[0] * weight)
-            y1 = int(last[1] * (1 - weight) + current[1] * weight)
-            x2 = int(last[2] * (1 - weight) + current[2] * weight)
-            y2 = int(last[3] * (1 - weight) + current[3] * weight)
+            weight = (k + 1) / (interval + 1)
+            x1 = int(first[0] * (1 - weight) + last[0] * weight)
+            y1 = int(first[1] * (1 - weight) + last[1] * weight)
+            x2 = int(first[2] * (1 - weight) + last[2] * weight)
+            y2 = int(first[3] * (1 - weight) + last[3] * weight)
             interpolated[k].append((x1, y1, x2, y2))
     
-    # 處理新出現的物體
-    for j in unmatched_current:
+    for j in unmatched_last:
         for k in range(interval):
-            interpolated[k].append(current_detections[j])
+            interpolated[k].append(last_detections[j])
     
     return interpolated

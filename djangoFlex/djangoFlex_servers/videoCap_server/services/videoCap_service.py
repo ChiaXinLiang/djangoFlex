@@ -1,7 +1,6 @@
 import cv2
 import time
 import threading
-import logging
 from ..models import VideoCapConfig, CurrentVideoClip
 from django.db import transaction
 from django.utils import timezone
@@ -13,8 +12,6 @@ import subprocess
 import shutil
 import pytz
 import re
-
-logger = logging.getLogger(__name__)
 
 class VideoCapService:
     def __init__(self):
@@ -31,11 +28,10 @@ class VideoCapService:
         self.check_interval = 0.1
         self.video_clip_dir = os.path.join('tmp', 'video_clip')
         self.resolution = (1280, 720)
-        self.gop_length = 30  # 15 FPS * 2 seconds per segment
-        self.hls_time = 2  # Segment duration of 2 seconds
+        self.gop_length = 30
+        self.hls_time = 1
         os.makedirs(self.video_clip_dir, exist_ok=True)
         self._load_configs()
-        logger.info("VideoCapService initialized")
 
     @staticmethod
     @transaction.atomic
@@ -44,7 +40,7 @@ class VideoCapService:
         try:
             CurrentVideoClip.objects.all().delete()
             VideoCapConfig.objects.update(is_active=False)
-        except Exception as e:
+        except Exception:
             pass
 
     def _load_configs(self):
@@ -52,7 +48,7 @@ class VideoCapService:
             for config in VideoCapConfig.objects.filter(is_active=True):
                 self.configs[config.rtmp_url] = config
                 self.running[config.rtmp_url] = False
-        except Exception as e:
+        except Exception:
             pass
 
     def start_server(self, rtmp_url):
@@ -73,7 +69,6 @@ class VideoCapService:
         self.capture_threads[rtmp_url] = threading.Thread(target=self._capture_loop, args=(rtmp_url,))
         self.capture_threads[rtmp_url].start()
 
-        logger.info(f"Server started for {rtmp_url}")
         return True, "Server started successfully"
 
     def stop_server(self, rtmp_url):
@@ -103,7 +98,6 @@ class VideoCapService:
         if os.path.exists(self.video_clip_dir):
             shutil.rmtree(self.video_clip_dir)
 
-        logger.info(f"Server stopped for {rtmp_url}")
         return True, "Server stopped successfully"
 
     def check_server_status(self, rtmp_url):
@@ -123,7 +117,7 @@ class VideoCapService:
             self.caps[rtmp_url].set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
             if not self.caps[rtmp_url].isOpened():
                 raise Exception("Failed to open video capture")
-        except Exception as e:
+        except Exception:
             self.caps[rtmp_url] = None
 
     def _capture_loop(self, rtmp_url):
@@ -165,13 +159,7 @@ class VideoCapService:
 
             def log_stderr(stderr):
                 for line in iter(stderr.readline, b''):
-                    decoded_line = line.decode().strip()
-                    if "Opening" in decoded_line and ".ts'" in decoded_line:
-                        logger.info(f"FFmpeg writing new TS file: {decoded_line}")
-                    elif "error" in decoded_line.lower():
-                        logger.error(f"FFmpeg error: {decoded_line}")
-                    else:
-                        logger.debug(f"FFmpeg output: {decoded_line}")
+                    pass
 
             threading.Thread(target=log_stderr, args=(ffmpeg_process.stderr,), daemon=True).start()
 
@@ -206,14 +194,12 @@ class VideoCapService:
                         self._set_inactive(rtmp_url)
                         break
 
-        except Exception as e:
-            logger.error(f"Error in capture loop for {rtmp_url}: {str(e)}")
+        except Exception:
+            pass
         finally:
-            logger.info(f"Closing FFmpeg process for {rtmp_url}")
             if ffmpeg_process:
                 ffmpeg_process.terminate()
                 ffmpeg_process.wait()
-            logger.info(f"FFmpeg process for {rtmp_url} closed")
 
     def _get_frame_size(self, rtmp_url):
         return self.resolution
@@ -278,21 +264,13 @@ class VideoCapService:
                                 end_time=ts_file_timestamp + timedelta(seconds=self.video_clip_duration),
                                 duration=self.video_clip_duration
                             )
-                        logger.info(f"Created new CurrentVideoClip for {rtmp_url}: {ts_file_path}")
-                    else:
-                        logger.warning(f"TS file does not exist: {ts_file_path}")
-                else:
-                    logger.debug(f"TS file already exists in CurrentVideoClip: {ts_file_path}")
-        except Exception as e:
-            logger.error(f"Error in _check_and_update_video_clip for {rtmp_url}: {str(e)}")
-            logger.exception("Detailed traceback:")
+        except Exception:
+            pass
 
     def __del__(self):
         for rtmp_url in list(self.running.keys()):
             if self.running[rtmp_url]:
                 self.stop_server(rtmp_url)
-
-        logger.info("VideoCapService destroyed")
 
     def list_running_threads(self):
         running_threads = []
