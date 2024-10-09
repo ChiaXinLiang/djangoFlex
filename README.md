@@ -6,15 +6,14 @@ Welcome to djangoFlex, the Django framework template that puts flexibility at yo
 
 djangoFlex comes pre-loaded with a smorgasbord of goodies:
 
-1. 🐰 **RabbitMQ Server**: Message queuing made easy!
-2. 🧠 **MLflow Server**: Machine learning experiment tracking at your service.
-3. 📹 **Video Capture Server**: Stream and capture video like a pro.
-4. 🔌 **RabbitMQ Client**: Communicate with RabbitMQ effortlessly.
-5. 🎥 **SRS Server**: Simple RTMP Server for your streaming needs.(currently need close the srs docker container manually)
+1. 🐰 **RabbitMQ**: Message queuing made easy!
+2. 📹 **SRS (Simple RTMP Server)**: For your streaming needs.
+3. 🐘 **PostgreSQL**: Robust relational database.
+4. 🔄 **Redis**: In-memory data structure store.
 
 ## 🚀 Quick Start
 
-1. Clone this bad boy:
+1. Clone this repository:
    ```
    git clone https://github.com/yourusername/djangoFlex.git
    cd djangoFlex
@@ -30,83 +29,83 @@ djangoFlex comes pre-loaded with a smorgasbord of goodies:
    conda activate djangoFlex
    ```
 
-3. Install the goodies:
+4. Install the dependencies:
    ```
    pip install -r requirements.txt
    ```
 
-4. Set up your secret sauce:
+5. Set up your environment variables:
    ```
    cp .env.example .env
    ```
-   Edit `.env` to your heart's content.
+   Edit `.env` to configure your settings.
 
-5. Migrate like a boss:
+6. Start the Docker containers:
+   ```
+   docker-compose up -d
+   ```
+
+7. Apply database migrations:
    ```
    python manage.py migrate
    ```
 
-6. Create a superuser (because you're super):
+8. Create a superuser:
    ```
    python manage.py createsuperuser
    ```
 
-7. Light it up:
+9. Run the Django development server:
    ```
    python manage.py runserver
    ```
 
-8. Visit `http://127.0.0.1:8000/` and bask in the glory of your new djangoFlex project!
+10. Visit `http://127.0.0.1:8000/` to see your djangoFlex project in action!
 
-## 🎛 Server Control Center
-
-For detailed API documentation, please refer to the Swagger UI at `http://127.0.0.1:8000/swagger/`.
+## 🎛 Service Details
 
 ### RabbitMQ
-- API: See Swagger UI for RabbitMQ server endpoints
-- Dashboard: `http://127.0.0.1:8000/servers/rabbitmq_dashboard/`
-
-### MLflow
-- API: See Swagger UI for MLflow server endpoints
-- Dashboard: `http://127.0.0.1:8000/servers/mlflow_dashboard/`
+- Management UI: `http://localhost:15676` (default credentials: guest/guest)
+- AMQP port: 5675
 
 ### SRS (Simple RTMP Server)
-- API: See Swagger UI for SRS server endpoints
-- Dashboard: `http://127.0.0.1:8000/servers/srs_dashboard/`
+- RTMP port: 1935
+- HTTP port: 8080
 
-### Video Capture
-- API: See Swagger UI for Video Capture server endpoints
+### PostgreSQL
+- Port: 5435
+- Default database: your_postgres_database
+- Default user: postgres
+
+### Redis
+- Port: 6399
 
 ## 🛠 Customization
 
-Feel free to tinker with the `djangoFlex/config/servers.yaml` file to bend the servers to your will. The world is your oyster!
+You can customize the services by editing the `docker-compose.yml` file and the corresponding environment variables in your `.env` file.
 
-## 🌈 Features That'll Make You Smile
+## 🌈 Features
 
-- 🏗 Pre-baked Django project structure
-- 🔐 Environment-based settings (shhh, it's a secret)
-- 📄 YAML-based server configuration (because who doesn't love YAML?)
-- 🐳 Docker integration for RabbitMQ and MLflow (containers, assemble!)
-- 📹 Video capture service for RTMP streams (lights, camera, action!)
-- 📚 Swagger API documentation (because reading is fundamental)
-- 🔗 URL configuration that just makes sense
+- 🏗 Pre-configured Django project structure
+- 🔐 Environment-based settings
+- 🐳 Docker integration for easy service management
+- 📚 Swagger API documentation (available at `/swagger/`)
+- 🔗 Sensible URL configuration
 
-## 🎨 Adding Your Own Flair
+## 🎨 Adding Your Own Apps
 
-1. Spawn a new app:
+1. Create a new Django app:
    ```
    python manage.py startapp myawesome_app
    ```
 
-2. Tell Django about your new creation in `djangoFlex/settings.py`:
+2. Add your new app to `INSTALLED_APPS` in `djangoFlex/settings.py`.
 
-3. Craft your views in `myawesome_app/views.py`.
+3. Develop your views, models, and URLs.
 
-4. Design your URL patterns in `myawesome_app/urls.py`.
+4. Include your app's URLs in `djangoFlex/urls.py`.
 
-5. Plug it into the main URLs in `djangoFlex/urls.py`:
-
-6. Migrate like there's no tomorrow:
+5. Apply migrations if you've added models:
    ```
    python manage.py makemigrations myawesome_app
    python manage.py migrate
@@ -114,17 +113,10 @@ Feel free to tinker with the `djangoFlex/config/servers.yaml` file to bend the s
 
 ## 🤝 Contributing
 
-Got ideas? We love ideas! Here's how to share them:
-
-1. Fork it
-2. Branch it
-3. Code it
-4. Commit it
-5. Push it
-6. Pull request it
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📜 License
 
-This project is licensed under the Apache License 2.0. Check out the [LICENSE](LICENSE) file for the legal mumbo jumbo.
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
 
-Now go forth and build something awesome with djangoFlex! 🚀✨
+Happy coding with djangoFlex! 🚀✨

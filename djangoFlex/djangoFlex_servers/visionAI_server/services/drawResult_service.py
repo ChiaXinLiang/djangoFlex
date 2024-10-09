@@ -4,6 +4,7 @@ import threading
 import logging
 import time
 from ...videoCap_server.models import VideoCapConfig, CurrentVideoClip
+from django.conf import settings
 from django.db import transaction
 import os
 from . import utils
@@ -39,12 +40,12 @@ class DrawResultService:
             for config in VideoCapConfig.objects.filter(is_active=True):
                 self.configs[config.rtmp_url] = {
                     'rtmp_url': config.rtmp_url,
-                    'output_url': f"rtmp://localhost/live/annotation_result_{config.rtmp_url.split('/')[-1]}",
+                    'output_url': f"rtmp://{settings.SERVERS_CONFIG['SRS_SERVER_HOST']}/t3-demo/result_{config.rtmp_url.split('/')[-1]}",
                     'is_active': True
                 }
                 self.running[config.rtmp_url] = False
         except Exception as e:
-            pass
+            logger.error(f"Error loading configurations: {str(e)}")
 
     def start_draw_service(self, rtmp_url):
         try:
@@ -55,7 +56,7 @@ class DrawResultService:
             if not config:
                 self.configs[rtmp_url] = {
                     'rtmp_url': rtmp_url,
-                    'output_url': f"rtmp://localhost/live/annotation_result_{rtmp_url.split('/')[-1]}",
+                    'output_url': f"rtmp://{settings.SERVERS_CONFIG['SRS_SERVER_HOST']}/t3-demo/result_{config.rtmp_url.split('/')[-1]}",
                     'is_active': True
                 }
 
@@ -117,8 +118,9 @@ class DrawResultService:
                         if self.running[rtmp_url]:  # Check again to ensure we should continue
                             try:
                                 self.ffmpeg_processes[rtmp_url].stdin.write(frame)
+                                time.sleep(1/15)
                             except Exception as e:
-                                time.sleep(1)
+                                time.sleep(1/15)
                                 self._start_ffmpeg_process(rtmp_url)  # Restart FFmpeg process
                         else:
                             break
