@@ -14,15 +14,13 @@ from pathlib import Path
 import os
 import sys
 from dotenv import load_dotenv
-from djangoFlex.config.load_config_from_yaml import load_config_from_yaml
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables and configuration
-load_dotenv()
-servers_config = load_config_from_yaml(BASE_DIR / 'djangoFlex' / 'config' / 'servers.yaml')
-SERVERS_CONFIG = servers_config
+load_dotenv(BASE_DIR)
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
@@ -48,13 +46,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "drf_yasg",
     'channels',
-    'djangoFlex_servers.rabbitmq_server',
-    'djangoFlex_servers.mlflow_server',
-    'djangoFlex_servers.srs_server',
     'djangoFlex_servers.videoCap_server',
     'djangoFlex_servers.visionAI_server',
-    'djangoFlex_servers.redis_server', 
-    'djangoFlex_servers.postgres_server',
     # 'clients.rabbitmq_client',
     # 'socketio',
 ]
@@ -93,16 +86,7 @@ ASGI_APPLICATION = 'djangoFlex.routing.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': SERVERS_CONFIG['POSTGRES_DATABASE'],
-        'USER': SERVERS_CONFIG['POSTGRES_ROOT_USER'],
-        'PASSWORD': SERVERS_CONFIG['POSTGRES_ROOT_PASSWORD'],
-        'HOST': SERVERS_CONFIG['POSTGRES_SERVER_HOST'],
-        'PORT': SERVERS_CONFIG['POSTGRES_SERVER_PORT'],
-    }
-}
+
 
 # Uncomment and modify if using MySQL
 # DATABASES = {

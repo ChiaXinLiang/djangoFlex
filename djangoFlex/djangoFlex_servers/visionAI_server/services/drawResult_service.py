@@ -41,7 +41,7 @@ class DrawResultService:
                 self.configs[config.rtmp_url] = {
                     'rtmp_url': config.rtmp_url,
                     # 'output_url': f"rtmp://192.168.1.77/live/result_demo",
-                    'output_url': f"rtmp://192.168.1.77/t3-demo/result_{config.rtmp_url.split('/')[-1]}",
+                    'output_url': f"rtmp://{settings.SRS_SERVER_HOST}/t3-demo/result_{config.rtmp_url.split('/')[-1]}",
                     'is_active': True
                 }
                 self.running[config.rtmp_url] = False

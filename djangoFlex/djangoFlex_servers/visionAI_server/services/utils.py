@@ -5,6 +5,7 @@ import cv2
 import subprocess
 from ultralytics import YOLO
 import numpy as np
+from django.conf import settings
 
 def check_path(path):
     """
@@ -18,7 +19,7 @@ def download_model_if_not_exists(model_name, model_version):
         model_download_path = f'models/{model_name}/{model_version}'
 
         if not os.path.exists(model_download_path):
-            mlflow.set_tracking_uri("http://192.168.1.77:5000")
+            mlflow.set_tracking_uri(settings.MLFLOW_TRACKING_URI)
             client = mlflow.tracking.MlflowClient()
             model_version_details = client.get_model_version(name=model_name, version=model_version)
 
@@ -39,6 +40,7 @@ def load_detection_model(model_path):
         raise
 
 def create_ffmpeg_process(output_url, fps, frame_size):
+    print(f"output_url: {output_url}")
     try:
         ffmpeg_command = [
             'ffmpeg',
