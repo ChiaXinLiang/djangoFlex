@@ -9,8 +9,8 @@ from django.db import transaction
 import os
 from . import utils
 import time
+import subprocess
 
-logger = logging.getLogger(__name__)
 
 class DrawResultService:
     def __init__(self):
@@ -40,12 +40,13 @@ class DrawResultService:
             for config in VideoCapConfig.objects.filter(is_active=True):
                 self.configs[config.rtmp_url] = {
                     'rtmp_url': config.rtmp_url,
-                    'output_url': f"rtmp://{settings.SERVERS_CONFIG['SRS_SERVER_HOST']}/t3-demo/result_{config.rtmp_url.split('/')[-1]}",
+                    # 'output_url': f"rtmp://192.168.1.77/live/result_demo",
+                    'output_url': f"rtmp://192.168.1.77/t3-demo/result_{config.rtmp_url.split('/')[-1]}",
                     'is_active': True
                 }
                 self.running[config.rtmp_url] = False
         except Exception as e:
-            logger.error(f"Error loading configurations: {str(e)}")
+            pass
 
     def start_draw_service(self, rtmp_url):
         try:
@@ -53,12 +54,6 @@ class DrawResultService:
                 return False, "Draw service already running"
 
             config = self.configs.get(rtmp_url)
-            if not config:
-                self.configs[rtmp_url] = {
-                    'rtmp_url': rtmp_url,
-                    'output_url': f"rtmp://{settings.SERVERS_CONFIG['SRS_SERVER_HOST']}/t3-demo/result_{config.rtmp_url.split('/')[-1]}",
-                    'is_active': True
-                }
 
             self.running[rtmp_url] = True
             self.draw_threads[rtmp_url] = threading.Thread(target=self._draw_loop, args=(rtmp_url,))
@@ -96,48 +91,44 @@ class DrawResultService:
     def _draw_loop(self, rtmp_url):
         try:
             config = self.configs[rtmp_url]
-            
-            if rtmp_url not in self.ffmpeg_processes:
-                self._start_ffmpeg_process(rtmp_url)
+            max_retries = 5
+            retry_delay = 10  # seconds
 
-            consecutive_empty_frames = 0
-            max_empty_frames = 30  # Increased from 10 to 30
-            restart_attempts = 0
-            max_restart_attempts = 5
-
-            while self.running[rtmp_url]:
-                if not self.ffmpeg_checkers[rtmp_url]():
-                    time.sleep(10)
-                    self._start_ffmpeg_process(rtmp_url)
-
-                frame_data = self._draw_results(rtmp_url)
-                if frame_data is not None and len(frame_data) > 0:
-                    consecutive_empty_frames = 0  # Reset the counter
-                    restart_attempts = 0  # Reset restart attempts
-                    for frame in frame_data:
-                        if self.running[rtmp_url]:  # Check again to ensure we should continue
-                            try:
-                                self.ffmpeg_processes[rtmp_url].stdin.write(frame)
-                                time.sleep(1/15)
-                            except Exception as e:
-                                time.sleep(1/15)
-                                self._start_ffmpeg_process(rtmp_url)  # Restart FFmpeg process
-                        else:
-                            break
-                else:
-                    consecutive_empty_frames += 1
-                    
-                    if consecutive_empty_frames >= max_empty_frames:
-                        restart_attempts += 1
-                        if restart_attempts > max_restart_attempts:
-                            break
-                        self._stop_ffmpeg_process(rtmp_url)
-                        time.sleep(10)  # Wait before restarting
+            for attempt in range(max_retries):
+                
+                try:
+                    if rtmp_url not in self.ffmpeg_processes:
                         self._start_ffmpeg_process(rtmp_url)
-                        consecutive_empty_frames = 0  # Reset counter after restart attempt
 
-                time.sleep(0.1)  # Small delay to prevent excessive CPU usage
+                    while self.running[rtmp_url]:
+                        if not self.ffmpeg_checkers[rtmp_url]():
+                            raise Exception("FFmpeg process is not running")
 
+                        start_time = time.time()
+                        result = self._draw_results(rtmp_url)
+                        if result is not None:
+                            frame_data, duration = result
+                            frame_data = utils.fps_controller_adjustment(frame_data, duration, self.fps)
+                            end_time = time.time()
+                            time_diff = end_time - start_time
+                            if frame_data is not None and len(frame_data) > 0:
+                                for frame in frame_data:
+                                    if self.running[rtmp_url]:
+                                        self.ffmpeg_processes[rtmp_url].stdin.write(frame)
+                                        # print(f"sleep_time: {sleep_time}", f"duration: {duration}", f"fps: {self.fps}")
+                                        sleep_time = max(0, ((1- time_diff) / self.fps) )
+                                        time.sleep(sleep_time)
+
+                        else:
+                            time.sleep(1 / self.fps)
+
+
+                    break  # If we get here, the loop ran successfully
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                    else:
+                        break
         except Exception as e:
             pass
         finally:
@@ -145,7 +136,10 @@ class DrawResultService:
 
     def _start_ffmpeg_process(self, rtmp_url):
         config = self.configs[rtmp_url]
-        self.ffmpeg_processes[rtmp_url], self.ffmpeg_checkers[rtmp_url] = utils.create_ffmpeg_process(config['output_url'], self.fps, self.frame_size)
+        try:
+            self.ffmpeg_processes[rtmp_url], self.ffmpeg_checkers[rtmp_url] = utils.create_ffmpeg_process(config['output_url'], self.fps, self.frame_size)
+        except Exception as e:
+            raise
 
     def _stop_ffmpeg_process(self, rtmp_url):
         if rtmp_url in self.ffmpeg_processes:
@@ -180,16 +174,16 @@ class DrawResultService:
                 # Update the last processed clip
                 self.last_processed_clip[rtmp_url] = current_video_clip
 
-                logger.info(f"Processing video clip: {os.path.basename(clip_path)}")
-
                 cap = cv2.VideoCapture(clip_path)
                 frames = []
+                duration = 0
 
                 while True:
                     ret, frame = cap.read()
                     if not ret:
                         break
                     frames.append(frame)
+                    duration += 1 / cap.get(cv2.CAP_PROP_FPS)
 
                 cap.release()
 
@@ -201,7 +195,7 @@ class DrawResultService:
                     
                     # Use draw_all_results from utils.py
                     frames = utils.draw_all_results(frames, first_result, last_result)
-                    return frames
+                    return frames, duration
                 else:
                     return None
         except Exception as e:

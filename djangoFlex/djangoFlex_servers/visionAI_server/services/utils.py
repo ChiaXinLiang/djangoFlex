@@ -213,3 +213,63 @@ def interpolate_detections(first_detections, last_detections, interval):
             interpolated[k].append(last_detections[j])
     
     return interpolated
+
+def fps_controller(frames, duration, fps):
+    target_frame_count = int(duration * fps)
+    current_frame_count = len(frames)
+    
+    if current_frame_count == target_frame_count:
+        return frames
+    elif current_frame_count > target_frame_count:
+        # Reduce frames
+        step = current_frame_count / target_frame_count
+        return [frames[int(i * step)] for i in range(target_frame_count)]
+    elif current_frame_count < target_frame_count:
+        # Duplicate frames
+        duplicated_frames = []
+        for i in range(target_frame_count):
+            index = min(int(i * current_frame_count / target_frame_count), current_frame_count - 1)
+            duplicated_frames.append(frames[index])
+        return duplicated_frames
+    else:
+        return frames  # This case should never happen, but included for completeness
+
+def fps_controller_sleep_time(frames, duration, fps):
+    target_frame_count = int(duration * fps)
+    current_frame_count = len(frames)
+    print(f"current_frame_count: {current_frame_count}", f"target_frame_count: {target_frame_count}")
+    if current_frame_count == target_frame_count:
+        return 0  # No sleep needed
+    elif current_frame_count > target_frame_count:
+        # Calculate sleep time to slow down frame rate
+        total_sleep_time = duration - (current_frame_count / fps)
+        return max(0, total_sleep_time / current_frame_count)
+    elif current_frame_count < target_frame_count:
+        # Calculate negative sleep time (indicating frames need to be duplicated)
+        return (target_frame_count - current_frame_count) / fps / current_frame_count
+    else:
+        return 0  # This case should never happen, but included for completeness
+
+def fps_controller_adjustment(frames, duration, fps):
+    target_frame_count = int(2 * fps)
+    current_frame_count = len(frames)
+    print(f"current_frame_count: {current_frame_count}", f"target_frame_count: {target_frame_count}")
+    
+    if current_frame_count == target_frame_count:
+        return frames  # No adjustment needed
+    
+    adjustment_factor = target_frame_count / current_frame_count
+    
+    if adjustment_factor > 1:
+        # Duplicate frames
+        new_frames = []
+        for i in range(target_frame_count):
+            index = int(i / adjustment_factor)
+            new_frames.append(frames[index])
+        frames = new_frames
+    elif adjustment_factor < 1:
+        # Remove frames
+        step = 1 / adjustment_factor
+        frames = [frames[int(i * step)] for i in range(target_frame_count)]
+    
+    return frames

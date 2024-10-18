@@ -12,6 +12,7 @@ import subprocess
 import shutil
 import pytz
 import re
+import logging
 
 class VideoCapService:
     def __init__(self):
@@ -28,10 +29,11 @@ class VideoCapService:
         self.check_interval = 0.1
         self.video_clip_dir = os.path.join('tmp', 'video_clip')
         self.resolution = (1280, 720)
-        self.gop_length = 30
-        self.hls_time = 1
+        self.gop_length = 15
+        self.hls_time = 2
         os.makedirs(self.video_clip_dir, exist_ok=True)
         self._load_configs()
+        self.logger = logging.getLogger(__name__)
 
     @staticmethod
     @transaction.atomic
@@ -40,16 +42,16 @@ class VideoCapService:
         try:
             CurrentVideoClip.objects.all().delete()
             VideoCapConfig.objects.update(is_active=False)
-        except Exception:
-            pass
+        except Exception as e:
+            logging.error(f"Error resetting video cap system: {str(e)}")
 
     def _load_configs(self):
         try:
             for config in VideoCapConfig.objects.filter(is_active=True):
                 self.configs[config.rtmp_url] = config
                 self.running[config.rtmp_url] = False
-        except Exception:
-            pass
+        except Exception as e:
+            self.logger.error(f"Error loading configs: {str(e)}")
 
     def start_server(self, rtmp_url):
         if rtmp_url in self.running and self.running[rtmp_url]:
@@ -117,7 +119,8 @@ class VideoCapService:
             self.caps[rtmp_url].set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
             if not self.caps[rtmp_url].isOpened():
                 raise Exception("Failed to open video capture")
-        except Exception:
+        except Exception as e:
+            self.logger.error(f"Error initializing capture for {rtmp_url}: {str(e)}")
             self.caps[rtmp_url] = None
 
     def _capture_loop(self, rtmp_url):
@@ -150,16 +153,19 @@ class VideoCapService:
             '-strftime', '1',
             '-strftime_mkdir', '1',
             '-hls_segment_filename', os.path.join(hls_output_dir, f'%Y%m%d%H%M_%s.ts'),
+            '-loglevel', 'warning',  # Set log level to warning
+            '-err_detect', 'ignore_err',  # Ignore decoding errors
             hls_output
         ]
 
         ffmpeg_process = None
         try:
-            ffmpeg_process = subprocess.Popen(ffmpeg_command, stderr=subprocess.PIPE)
+            ffmpeg_process = subprocess.Popen(ffmpeg_command, stderr=subprocess.PIPE, universal_newlines=True)
 
             def log_stderr(stderr):
-                for line in iter(stderr.readline, b''):
-                    pass
+                for line in iter(stderr.readline, ''):
+                    if line.strip():
+                        self.logger.warning(f"FFmpeg: {line.strip()}")
 
             threading.Thread(target=log_stderr, args=(ffmpeg_process.stderr,), daemon=True).start()
 
@@ -194,8 +200,8 @@ class VideoCapService:
                         self._set_inactive(rtmp_url)
                         break
 
-        except Exception:
-            pass
+        except Exception as e:
+            self.logger.error(f"Error in capture loop for {rtmp_url}: {str(e)}")
         finally:
             if ffmpeg_process:
                 ffmpeg_process.terminate()
@@ -264,8 +270,8 @@ class VideoCapService:
                                 end_time=ts_file_timestamp + timedelta(seconds=self.video_clip_duration),
                                 duration=self.video_clip_duration
                             )
-        except Exception:
-            pass
+        except Exception as e:
+            self.logger.error(f"Error checking and updating video clip for {rtmp_url}: {str(e)}")
 
     def __del__(self):
         for rtmp_url in list(self.running.keys()):
