@@ -71,6 +71,7 @@ djangoFlex comes pre-loaded with a smorgasbord of goodies:
 
 ### SRS (Simple RTMP Server)
 - RTMP port: 1935
+- RTMP port: 1985
 - HTTP port: 8080
 
 ### PostgreSQL
