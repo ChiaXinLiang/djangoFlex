@@ -57,25 +57,18 @@ def stream_to_rtmp(rtmp_url: str, source_video: str) -> None:
             ffmpeg_process.terminate()
             ffmpeg_process.wait()
 
-if __name__ == '__main__':
-    # 設置命令行參數解析器
-    parser = argparse.ArgumentParser(description='將影片流傳輸到RTMP服務器')
-    parser.add_argument('--rtmp1', default="rtmp://localhost/live/livestream/1", help='RTMP URL')
-    parser.add_argument('--source1', default="./video/outpu6.mp4", help='第一條源影片檔案路徑')
+# if __name__ == '__main__':
+#     # 設置命令行參數解析器
+#     parser = argparse.ArgumentParser(description='將影片流傳輸到RTMP服務器')
+#     parser.add_argument('--rtmp1', default="rtmp://localhost/live/livestream/1", help='RTMP URL')
+#     parser.add_argument('--source1', default="./video/outpu6.mp4", help='第一條源影片檔案路徑')
+#     args = parser.parse_args()
 
-    parser.add_argument('--rtmp2', default="rtmp://localhost/live/livestream/2", help='RTMP URL')
-    parser.add_argument('--source2', default="./video/outpu9.mp4", help='第二條源影片檔案路徑')
+#     # 創建兩個線程來同時進行流傳輸
+#     thread1 = threading.Thread(target=stream_to_rtmp, args=(args.rtmp, args.source))
 
-    args = parser.parse_args()
+#     # 啟動線程
+#     thread1.start()
 
-    # 創建兩個線程來同時進行流傳輸
-    thread1 = threading.Thread(target=stream_to_rtmp, args=(args.rtmp1, args.source1))
-    thread2 = threading.Thread(target=stream_to_rtmp, args=(args.rtmp2, args.source2))
-
-    # 啟動線程
-    thread1.start()
-    thread2.start()
-
-    # 等待線程完成
-    thread1.join()
-    thread2.join()
+#     # 等待線程完成
+#     thread1.join()

@@ -9,13 +9,13 @@ from djangoFlex.config.load_config_from_yaml import load_config_from_yaml
 # ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
 
 # MLflow Configuration
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://192.168.1.77:5000")
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
 MLFLOW_BACKEND_STORE = os.getenv("MLFLOW_BACKEND_STORE", "mlruns")
 MLFLOW_SERVER_PORT = int(os.getenv("MLFLOW_SERVER_PORT", "5000"))
-MLFLOW_SERVER_HOST = os.getenv("MLFLOW_SERVER_HOST", "192.168.1.77")
+MLFLOW_SERVER_HOST = os.getenv("MLFLOW_SERVER_HOST", "localhost")
 
 # RabbitMQ Configuration
-RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "192.168.1.77")
+RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "localhost")
 RABBITMQ_PORT = int(os.getenv("RABBITMQ_PORT", "5675"))
 RABBITMQ_DASHBOARD_PORT = int(os.getenv("RABBITMQ_DASHBOARD_PORT", "15676"))
 RABBITMQ_USER = os.getenv("RABBITMQ_USER", "guest")
@@ -23,11 +23,11 @@ RABBITMQ_PASSWORD = os.getenv("RABBITMQ_PASSWORD", "guest")
 RABBITMQ_VHOST = os.getenv("RABBITMQ_VHOST", "/")
 
 # Celery Configuration
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "amqp://guest:guest@192.168.1.77:5672/")
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "amqp://guest:guest@localhost:5672/")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
 
 # SRS (Simple RTMP Server) Configuration
-SRS_SERVER_HOST = os.getenv("SRS_SERVER_HOST", "192.168.1.77")
+SRS_SERVER_HOST = os.getenv("SRS_SERVER_HOST", "localhost")
 SRS_SERVER_PORT = int(os.getenv("SRS_SERVER_PORT", "1935"))
 SRS_HTTP_SERVER_PORT = int(os.getenv("SRS_HTTP_SERVER_PORT", "8080"))
 
@@ -38,7 +38,7 @@ VISIONAI_ENTITY_TYPE_CONFIG_PATH = os.getenv("VISIONAI_ENTITY_TYPE_CONFIG_PATH",
 VISIONAI_SCENE_TYPE_CONFIG_PATH = os.getenv("VISIONAI_SCENE_TYPE_CONFIG_PATH", "djangoFlex_servers/visionAI_server/type_initial_config/scene_type.yaml")
 
 # PostgreSQL Configuration
-POSTGRES_SERVER_HOST = os.getenv("POSTGRES_SERVER_HOST", "192.168.1.77")
+POSTGRES_SERVER_HOST = os.getenv("POSTGRES_SERVER_HOST", "localhost")
 POSTGRES_SERVER_PORT = int(os.getenv("POSTGRES_SERVER_PORT", "5435"))
 POSTGRES_ROOT_USER = os.getenv("POSTGRES_ROOT_USER", "postgres")
 POSTGRES_ROOT_PASSWORD = os.getenv("POSTGRES_ROOT_PASSWORD", "your_postgres_password")

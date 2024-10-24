@@ -5,17 +5,17 @@ from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.utils.decorators import method_decorator
-from .services.objectDetect_service import ObjectDetectService
+# from .services.objectDetect_service import ObjectDetectService
 
 
 class ObjectDetectView(APIView):
     object_detect_service = None
 
-    @classmethod
-    def get_object_detect_service(cls):
-        if cls.object_detect_service is None:
-            cls.object_detect_service = ObjectDetectService()
-        return cls.object_detect_service
+    # @classmethod
+    # def get_object_detect_service(cls):
+    #     if cls.object_detect_service is None:
+    #         cls.object_detect_service = ObjectDetectService()
+    #     return cls.object_detect_service
 
     @method_decorator(name='post', decorator=swagger_auto_schema(
         operation_description="Control the object detection service",

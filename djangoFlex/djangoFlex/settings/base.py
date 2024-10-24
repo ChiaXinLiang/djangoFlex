@@ -29,7 +29,8 @@ load_dotenv(BASE_DIR)
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'your-secret-key-here')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
+# DEBUG = os.getenv('DEBUG', 'False') == 'True'
+DEBUG = True
 
 # ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
 ALLOWED_HOSTS = ['*']
@@ -43,6 +44,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    'django_extensions',
     "rest_framework",
     "drf_yasg",
     'channels',

@@ -17,7 +17,7 @@ class VideoCapConfig(models.Model):
 
     def __str__(self):
         return f"VideoCapConfig: {self.name}, RTMP URL={self.rtmp_url}, Active={self.is_active}"
-    
+
 class CurrentFrame(models.Model):
     id = models.AutoField(primary_key=True)
     config = models.ForeignKey(VideoCapConfig, on_delete=models.CASCADE, related_name='frames')
@@ -70,3 +70,16 @@ class AIInferenceResult(models.Model):
 
     def __str__(self):
         return f"AI Result for {self.video_clip} at {self.timestamp}"
+
+class CameraList(models.Model):
+    camera_name = models.CharField(max_length=100, unique=True)
+    camera_url = models.CharField(max_length=255, unique=True)
+    camera_status = models.BooleanField(default=False)  # 添加這個欄位來跟踪攝像機狀態
+    stream_upload_video_path = models.CharField(max_length=255, blank=True, null=True)  # 添加這個欄位來保存視頻文件的路徑
+
+    class Meta:
+        verbose_name = "Camera"
+        verbose_name_plural = "Camera List"
+
+    def __str__(self):
+        return f"Camera: {self.camera_name}, URL={self.camera_url}, Status={self.camera_status}"

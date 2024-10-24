@@ -66,16 +66,22 @@ if __name__ == '__main__':
     parser.add_argument('--rtmp2', default="rtmp://localhost/live/livestream/2", help='RTMP URL')
     parser.add_argument('--source2', default="./video/outpu9.mp4", help='第二條源影片檔案路徑')
 
+    parser.add_argument('--rtmp3', default="rtmp://localhost/live/livestream/3", help='RTMP URL')
+    parser.add_argument('--source3', default="./video/0641.mp4", help='第三條源影片檔案路徑')
+
     args = parser.parse_args()
 
     # 創建兩個線程來同時進行流傳輸
     thread1 = threading.Thread(target=stream_to_rtmp, args=(args.rtmp1, args.source1))
     thread2 = threading.Thread(target=stream_to_rtmp, args=(args.rtmp2, args.source2))
+    thread3 = threading.Thread(target=stream_to_rtmp, args=(args.rtmp3, args.source3))
 
     # 啟動線程
     thread1.start()
     thread2.start()
+    thread3.start()
 
     # 等待線程完成
     thread1.join()
     thread2.join()
+    thread3.join()
