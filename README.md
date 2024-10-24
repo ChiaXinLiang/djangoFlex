@@ -19,7 +19,7 @@ djangoFlex comes pre-loaded with a smorgasbord of goodies:
 
 1. Clone this repository:
    ```
-   git clone https://github.com/yourusername/djangoFlex.git
+   git clone -b <branch name> https://github.com/yourusername/djangoFlex.git
    cd djangoFlex
    ```
 
@@ -42,11 +42,12 @@ djangoFlex comes pre-loaded with a smorgasbord of goodies:
 
 5. Start the Docker containers:
    ```
-   docker-compose up -d
+   sudo docker-compose -f docker-compose.yml up -d
    ```
 
 6. Apply database migrations:
    ```
+   python manage.py makemigrations
    python manage.py migrate
    ```
 
