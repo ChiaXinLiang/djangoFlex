@@ -26,8 +26,11 @@ This project, named djangoFlex, is a comprehensive Django-based application that
 djangoFlex/
 ├── .env
 ├── clear_all_migrate_and_db.py
+├── clear_pyc.py
 ├── db.sqlite3
 ├── manage.py
+├── LICENSE
+├── README.md
 ├── clients/
 │   ├── routing.py
 │   ├── urls.py
@@ -55,7 +58,8 @@ djangoFlex/
 │   ├── asgi.py
 │   ├── celery.py
 │   ├── routing.py
-│   ├── settings.py
+│   ├── settings/
+│   │   └── base.py
 │   ├── urls.py
 │   ├── wsgi.py
 │   ├── __init__.py
@@ -145,6 +149,7 @@ djangoFlex/
 │   │       └── srs_service.py
 │   ├── videoCap_server/
 │   │   ├── admin.py
+│   │   ├── admin_frame.py
 │   │   ├── apps.py
 │   │   ├── models.py
 │   │   ├── models_no_batch.py
@@ -158,6 +163,12 @@ djangoFlex/
 │   │   ├── migrations/
 │   │   │   ├── 0001_initial.py
 │   │   │   ├── 0002_videocapconfig_redis_client_and_more.py
+│   │   │   ├── 0003_alter_currentframe_options_alter_currentframe_config_and_more.py
+│   │   │   ├── 0004_currentvideoclip_aiinferenceresult.py
+│   │   │   ├── 0005_cameralist.py
+│   │   │   ├── 0006_alter_cameralist_options_and_more.py
+│   │   │   ├── 0007_alter_cameralist_options_cameralist_camera_status.py
+│   │   │   ├── 0008_cameralist_stream_upload_video_path.py
 │   │   │   └── __init__.py
 │   │   └── services/
 │   │       ├── drawResult_service.py
@@ -191,7 +202,7 @@ djangoFlex/
 │       │   ├── violationDetect_service.py
 │       │   ├── violationDetect_service_full.py
 │       │   ├── visionAI_db_service.py
-│       │   └── utils/
+│       │   └── utils.py
 │       └── type_initial_config/
 │           ├── entity_type.yaml
 │           ├── role.yaml
@@ -206,4 +217,5 @@ djangoFlex/
 │   ├── __init__.py
 │   └── migrations/
 │       └── __init__.py
-└── extensions/
+├── extensions/
+└── init_docker.sh

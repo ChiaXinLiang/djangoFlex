@@ -47,6 +47,7 @@ djangoFlex comes pre-loaded with a smorgasbord of goodies:
 
 6. Apply database migrations:
    ```
+   cd djangoFlex
    python manage.py makemigrations
    python manage.py migrate
    ```
@@ -62,6 +63,15 @@ djangoFlex comes pre-loaded with a smorgasbord of goodies:
    ```
 
 9. Visit `http://127.0.0.1:8000/admin` to see your djangoFlex project in action!
+
+10. Run SRS Client
+   ```
+   cd test
+   python srs_client.py
+   ```
+
+11. Visit `http://127.0.0.1:8080` to see your stream.
+
 
 ## 🎛 Service Details
 
