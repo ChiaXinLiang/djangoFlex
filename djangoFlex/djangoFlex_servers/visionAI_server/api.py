@@ -5,17 +5,17 @@ from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.utils.decorators import method_decorator
-from .services.violationDetect_service import ViolationDetectService
-from .services.objectDetect_service import ObjectDetectService
+# from .services.violationDetect_service import ViolationDetectService
+# from .services.objectDetect_service import ObjectDetectService
 
 class ViolationDetectView(APIView):
     violation_detect_service = None
 
     @classmethod
-    def get_violation_detect_service(cls):
-        if cls.violation_detect_service is None:
-            cls.violation_detect_service = ViolationDetectService()
-        return cls.violation_detect_service
+    # def get_violation_detect_service(cls):
+        # if cls.violation_detect_service is None:
+            # cls.violation_detect_service = ViolationDetectService()
+        # return cls.violation_detect_service
 
     @method_decorator(name='post', decorator=swagger_auto_schema(
         operation_description="Detect violations or control the violation detection service",

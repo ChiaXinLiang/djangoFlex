@@ -41,7 +41,7 @@ class DrawResultService:
                 self.configs[config.rtmp_url] = {
                     'rtmp_url': config.rtmp_url,
                     # 'output_url': f"rtmp://192.168.1.77/live/result_demo",
-                    'output_url': f"rtmp://{settings.SRS_SERVER_HOST}/t3-demo/result_{config.rtmp_url.split('/')[-1]}",
+                    'output_url': f"rtmp://localhost/live/result_{config.rtmp_url.split('/')[-1]}",
                     'is_active': True
                 }
                 self.running[config.rtmp_url] = False
@@ -95,7 +95,7 @@ class DrawResultService:
             retry_delay = 10  # seconds
 
             for attempt in range(max_retries):
-                
+
                 try:
                     if rtmp_url not in self.ffmpeg_processes:
                         self._start_ffmpeg_process(rtmp_url)
@@ -157,12 +157,12 @@ class DrawResultService:
             with transaction.atomic():
                 config = self.configs[rtmp_url]
                 current_video_clip = CurrentVideoClip.objects.filter(config__rtmp_url=rtmp_url).order_by('-start_time').first()
-                
+
                 if current_video_clip is None:
                     return None
 
                 clip_path = current_video_clip.clip_path
-                
+
                 if not clip_path or not os.path.exists(clip_path) or not clip_path.endswith('.ts'):
                     return None
 
@@ -192,7 +192,7 @@ class DrawResultService:
                     last_frame = frames[-1]
                     first_result = self.detection_model(first_frame, classes=[0], verbose=False, imgsz=1280)
                     last_result = self.detection_model(last_frame, classes=[0], verbose=False, imgsz=1280)
-                    
+
                     # Use draw_all_results from utils.py
                     frames = utils.draw_all_results(frames, first_result, last_result)
                     return frames, duration

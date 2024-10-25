@@ -5,7 +5,7 @@ from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.utils.decorators import method_decorator
-from .services.visionAI_db_service import VisionAIDBService
+# from .services.visionAI_db_service import VisionAIDBService
 from .serializers.serializer import RuleSerializer, RoleSerializer, EntityTypeSerializer, SceneTypeSerializer
 
 class VisionAIDBAPI(APIView):

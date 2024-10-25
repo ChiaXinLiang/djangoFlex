@@ -8,16 +8,16 @@ class VisionaiServerConfig(AppConfig):
         if os.environ.get('RUN_MAIN', None) != 'true':
             try:
                 from .services.drawResult_service import DrawResultService
-                from .services.violationDetect_service import ViolationDetectService
+                # from .services.violationDetect_service import ViolationDetectService
 
                 # Stop existing services
-                DrawResultService.stop_all_services()
-                ViolationDetectService.stop_service()
+                # DrawResultService.stop_all_services()
+                # ViolationDetectService.stop_service()
 
                 # Initialize DrawResultService
                 DrawResultService()
                 # Initialize ViolationDetectService
-                ViolationDetectService()
+                # ViolationDetectService()
 
                 print("Vision AI服务已停止并重新初始化完成！")
             except Exception as e:
