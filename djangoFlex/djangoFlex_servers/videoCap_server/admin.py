@@ -47,8 +47,7 @@ class AIInferenceResultAdmin(admin.ModelAdmin):
 
 @admin.register(CameraList)
 class CameraListAdmin(admin.ModelAdmin):
-    # list_display = ('camera_name', 'camera_url', 'camera_status_display', 'start_stop_button', 'camera_online_status')
-    list_display = ('camera_name', 'camera_url', 'camera_status_display', 'start_stop_button')
+    list_display = ('camera_name', 'camera_url', 'camera_online_status', 'camera_status_display', 'start_stop_button')
     list_editable = ('camera_url',)
     search_fields = ('camera_name', 'camera_url')
     list_filter = ('camera_name',)
@@ -71,14 +70,13 @@ class CameraListAdmin(admin.ModelAdmin):
                                reverse('admin:start_camera', args=[obj.camera_url]))
     start_stop_button.short_description = '錄影操作'
 
-    # def camera_online_status(self, obj):
-    #     # video_cap_service = VideoCapService()
-    #     is_online = VideoCapService().check_camera_online(rtmp_url=obj.camera_url)
-    #     print('is_online:', is_online)
-    #     return format_html('<span style="color: {};">{}</span>',
-    #                        'green' if is_online else 'red',
-    #                        '在線' if is_online else '離線')
-    # camera_online_status.short_description = '串流狀態'
+    def camera_online_status(self, obj):
+        is_online = VideoCapService().check_camera_online(rtmp_url=obj.camera_url)
+        print('is_online:', is_online)
+        return format_html('<span style="color: {};">{}</span>',
+                           'green' if is_online else 'red',
+                           '在線' if is_online else '離線')
+    camera_online_status.short_description = '串流狀態'
 
     def get_urls(self):
         urls = super().get_urls()
