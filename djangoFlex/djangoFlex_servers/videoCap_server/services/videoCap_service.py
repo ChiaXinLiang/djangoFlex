@@ -205,7 +205,7 @@ class VideoCapService:
             '-y',
             '-i', rtmp_url,
             '-c:v', 'libx264',
-            '-preset', 'ultrafast', #'ultrafast',
+            '-preset', 'ultrafast',
             '-tune', 'zerolatency',
             '-r', str(self.fps),
             '-g', str(self.gop_length),
@@ -223,7 +223,6 @@ class VideoCapService:
             '-err_detect', 'ignore_err',  # Ignore decoding errors
             hls_output
         ]
-
 
         ffmpeg_process = None
         try:
