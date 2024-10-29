@@ -27,7 +27,6 @@ def stream_to_rtmp(rtmp_url: str, source_video: str) -> None:
         "-re",
         "-stream_loop", "-1",  # 這將無限循環重複影片
         "-i", source_video,
-        # "-c", "copy",
         "-vcodec", "libx264",
         "-preset:v", "ultrafast",
         "-f", "flv",
@@ -56,19 +55,3 @@ def stream_to_rtmp(rtmp_url: str, source_video: str) -> None:
             print("正在停止流傳輸進程")
             ffmpeg_process.terminate()
             ffmpeg_process.wait()
-
-# if __name__ == '__main__':
-#     # 設置命令行參數解析器
-#     parser = argparse.ArgumentParser(description='將影片流傳輸到RTMP服務器')
-#     parser.add_argument('--rtmp1', default="rtmp://localhost/live/livestream/1", help='RTMP URL')
-#     parser.add_argument('--source1', default="./video/outpu6.mp4", help='第一條源影片檔案路徑')
-#     args = parser.parse_args()
-
-#     # 創建兩個線程來同時進行流傳輸
-#     thread1 = threading.Thread(target=stream_to_rtmp, args=(args.rtmp, args.source))
-
-#     # 啟動線程
-#     thread1.start()
-
-#     # 等待線程完成
-#     thread1.join()
