@@ -65,3 +65,15 @@ class VisionAIConfig(models.Model):
     violation_detect_frequency = models.IntegerField(default=1)  # Set violation detect frequency to 1sec 1 frame
     aggregation_interval = models.IntegerField(default=5)  # Default aggregation interval
     last_updated = models.DateTimeField(auto_now=True)
+
+class CameraDrawingStatus(models.Model):
+    camera_url = models.URLField(unique=True)
+    is_drawing = models.BooleanField(default=False)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.camera_url} - {'正在畫圖' if self.is_drawing else '未畫圖'}"
+
+    class Meta:
+        verbose_name = "攝影機畫圖狀態"
+        verbose_name_plural = "攝影機畫圖狀態"

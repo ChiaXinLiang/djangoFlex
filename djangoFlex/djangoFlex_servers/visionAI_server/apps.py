@@ -7,7 +7,7 @@ class VisionaiServerConfig(AppConfig):
     def ready(self):
         if os.environ.get('RUN_MAIN', None) != 'true':
             try:
-                from .services.drawResult_service import DrawResultService
+                from .services.drawing_service import DrawingService
                 # from .services.violationDetect_service import ViolationDetectService
 
                 # Stop existing services
@@ -15,7 +15,7 @@ class VisionaiServerConfig(AppConfig):
                 # ViolationDetectService.stop_service()
 
                 # Initialize DrawResultService
-                DrawResultService()
+                DrawingService()
                 # Initialize ViolationDetectService
                 # ViolationDetectService()
 

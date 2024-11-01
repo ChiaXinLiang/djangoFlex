@@ -1,19 +1,20 @@
 from rest_framework.views import APIView
+from django.http import HttpRequest
 from rest_framework.response import Response
 from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.utils.decorators import method_decorator
-from .services.drawResult_service import DrawResultService
+from .services.video_processing_service import VideoProcessingService
 from ..videoCap_server.models import VideoCapConfig
 
 class DrawView(APIView):
     draw_result_service = None
 
     @classmethod
-    def get_draw_result_service(cls):
+    def get_video_processing_service(cls):
         if cls.draw_result_service is None:
-            cls.draw_result_service = DrawResultService()
+            cls.draw_result_service = VideoProcessingService()
         return cls.draw_result_service
 
     @method_decorator(name='post', decorator=swagger_auto_schema(
@@ -41,34 +42,36 @@ class DrawView(APIView):
             500: "Internal Server Error"
         }
     ))
-    def post(self, request):
-        action = request.data.get('action')
-        draw_result_service = self.get_draw_result_service()
+    def post(self, request, action=None, rtmp_url=None):
+        if isinstance(request, HttpRequest):
+            # 如果是從 admin 調用，action 和 rtmp_url 會作為參數傳入
+            data = {'action': action, 'rtmp_url': rtmp_url}
+        else:
+            # 如果是 API 調用，從 request.data 中獲取數據
+            data = request.data
 
-        if action not in ['start', 'stop']:
+        action = data.get('action')
+        rtmp_url = data.get('rtmp_url')
+        camera_name = data.get('camera_name')
+        video_processing_service = self.get_video_processing_service()
+
+        if action not in ['start', 'stop', 'status']:
             return Response({"success": False, "message": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if action in ['start', 'stop', 'status'] and not rtmp_url:
+            return Response({"error": "此操作需要 RTMP URL"}, status=status.HTTP_400_BAD_REQUEST)
 
         active_configs = VideoCapConfig.objects.filter(is_active=True)
         affected_count = 0
 
         if action == 'start':
-            for config in active_configs:
-                rtmp_url = config.rtmp_url
-                success, message = draw_result_service.start_draw_service(rtmp_url)
-                if success:
-                    affected_count += 1
+            success, message = video_processing_service.start_draw_service(rtmp_url)
             action_verb = "Started"
-        else:  # stop
-            for config in active_configs:
-                rtmp_url = config.rtmp_url
-                success, message = draw_result_service.stop_draw_service(rtmp_url)
-                if success:
-                    affected_count += 1
+        elif action == 'stop':  # stop
+            success, message = video_processing_service.stop_draw_service(rtmp_url)
             action_verb = "Stopped"
 
         total_count = active_configs.count()
-        message = f"{action_verb} {affected_count} out of {total_count} draw services"
-        success = affected_count > 0
 
         return Response({
             "success": success,

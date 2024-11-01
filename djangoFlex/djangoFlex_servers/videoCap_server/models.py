@@ -74,8 +74,7 @@ class AIInferenceResult(models.Model):
 class CameraList(models.Model):
     camera_name = models.CharField(max_length=100, unique=True)
     camera_url = models.CharField(max_length=255, unique=True)
-    camera_status = models.BooleanField(default=False)  # 添加這個欄位來跟踪攝像機狀態
-    stream_upload_video_path = models.CharField(max_length=255, blank=True, null=True)  # 添加這個欄位來保存視頻文件的路徑
+    camera_status = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Camera"
