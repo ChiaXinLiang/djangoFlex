@@ -17,7 +17,6 @@ import logging
 import ssl
 import socket
 from urllib.parse import urlparse
-from .cameraStream_service import stream_to_rtmp
 
 class VideoCapService:
     def __init__(self):
@@ -45,7 +44,6 @@ class VideoCapService:
         self.logger = logging.getLogger(__name__)
         self.stream_processes = {}
         self.stream_threads = {}
-        self._stream_to_rtmp = stream_to_rtmp
 
     @staticmethod
     @transaction.atomic
@@ -205,7 +203,7 @@ class VideoCapService:
             '-y',
             '-i', rtmp_url,
             '-c:v', 'libx264',
-            '-preset', 'ultrafast', #'ultrafast',
+            '-preset', 'ultrafast',
             '-tune', 'zerolatency',
             '-r', str(self.fps),
             '-g', str(self.gop_length),
@@ -223,7 +221,6 @@ class VideoCapService:
             '-err_detect', 'ignore_err',  # Ignore decoding errors
             hls_output
         ]
-
 
         ffmpeg_process = None
         try:
@@ -319,18 +316,18 @@ class VideoCapService:
         if os.path.exists(hls_output_dir):
             shutil.rmtree(hls_output_dir)
 
-    # async def update_frame(self, rtmp_url, frame):
-    #     """
-    #     異步更新當前幀。
-    #     將幀編碼為 JPEG 並存儲在 Redis 中。
-    #     """
-    #     if frame is None:
-    #         return
+    async def update_frame(self, rtmp_url, frame):
+        """
+        異步更新當前幀。
+        將幀編碼為 JPEG 並存儲在 Redis 中。
+        """
+        if frame is None:
+            return
 
-    #     _, buffer = cv2.imencode('.jpg', frame)
-    #     frame_bytes = buffer.tobytes()
+        _, buffer = cv2.imencode('.jpg', frame)
+        frame_bytes = buffer.tobytes()
 
-    #     await asyncio.to_thread(self.redis_client.set, f"video_cap_service:current_image:{rtmp_url}", frame_bytes)
+        await asyncio.to_thread(self.redis_client.set, f"video_cap_service:current_image:{rtmp_url}", frame_bytes)
 
     def _check_and_update_video_clip(self, rtmp_url, hls_output_dir):
         """
@@ -417,152 +414,6 @@ class VideoCapService:
                         camera.save()
         return stopped_count
 
-    def start_camera(self, rtmp_url):
-        """
-        啟動指定 RTMP URL 的攝像機並開始串流。
-        """
-        try:
-            camera = CameraList.objects.filter(camera_url=rtmp_url).first()
-
-            # 啟動串流
-            stream_thread = threading.Thread(
-                target=self._stream_to_rtmp,
-                args=(camera.camera_url, camera.stream_upload_video_path)
-            )
-            stream_thread.start()
-            self.stream_threads[camera.camera_url] = stream_thread
-
-            return True, "攝像機啟動並開始串流成功。"
-
-        except CameraList.DoesNotExist:
-            return False, f"未找到 ID 為 {camera.camera_name} 的攝像機"
-        except Exception as e:
-            return False, f"啟動攝像機時發生錯誤：{str(e)}"
-
-    def stop_camera(self, rtmp_url):
-        """
-        停止指定 RTMP URL 的攝像機並結束串流。
-        """
-        try:
-            camera = CameraList.objects.filter(camera_url=rtmp_url).first()
-            if not camera:
-                return False, f"未找到 URL 為 {rtmp_url} 的攝像機"
-
-            # 停止串流
-            if rtmp_url in self.stream_threads:
-                self._stop_stream(rtmp_url)
-
-            # 更新攝像機狀態
-            camera.camera_status = False
-            camera.save()
-
-            return True, "攝像機停止並結束串流成功"
-        except Exception as e:
-            self.logger.error(f"停止攝像機時發生錯誤：{str(e)}")
-            return False, f"停止攝像機時發生錯誤：{str(e)}"
-
-    # def _stop_stream(self, rtmp_url):
-    #     """
-    #     停止指定 RTMP URL 的串流。
-    #     """
-    #     if rtmp_url in self.stream_stop_events:
-    #         self.logger.info(f"正在停止 {rtmp_url} 的串流")
-    #         self.stream_stop_events[rtmp_url].set()  # 設置停止事件
-
-    #     if rtmp_url in self.stream_threads:
-    #         thread = self.stream_threads[rtmp_url]
-    #         thread.join(timeout=10)  # 等待線程結束，最多等待10秒
-    #         if thread.is_alive():
-    #             self.logger.warning(f"{rtmp_url} 的串流線程未能在指定時間內停止")
-    #         else:
-    #             self.logger.info(f"{rtmp_url} 的串流已成功停止")
-    #         del self.stream_threads[rtmp_url]
-
-    #     if rtmp_url in self.stream_stop_events:
-    #         del self.stream_stop_events[rtmp_url]
-
-
-    # def _stream_to_rtmp(rtmp_url: str, source_video: str) -> None:
-    #     """
-    #     將源影片檔案流式傳輸到指定的RTMP URL。
-
-    #     此函數使用FFmpeg將影片檔案以流的形式傳輸到RTMP服務器。
-    #     它會無限循環播放影片，直到用戶中斷或發生錯誤。
-
-    #     參數:
-    #     rtmp_url (str): 目標RTMP服務器的URL。
-    #     source_video (str): 源影片檔案的路徑。
-
-    #     返回:
-    #     None
-    #     """
-    #     if not os.path.exists(source_video):
-    #         print(f"錯誤：源影片檔案 '{source_video}' 不存在。")
-    #         return
-
-    #     ffmpeg_command = [
-    #         "ffmpeg",
-    #         "-re",
-    #         "-stream_loop", "-1",  # 這將無限循環重複影片
-    #         "-i", source_video,
-    #         # "-c", "copy",
-    #         "-vcodec", "libx264",
-    #         "-preset:v", "ultrafast",
-    #         "-f", "flv",
-    #         rtmp_url
-    #     ]
-
-    #     try:
-    #         print(f"開始從 {source_video} 向 {rtmp_url} 傳輸流")
-    #         ffmpeg_process = subprocess.Popen(ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-    #         while True:
-    #             output = ffmpeg_process.stderr.readline().decode().strip()
-    #             if output:
-    #                 print(output)
-
-    #             if ffmpeg_process.poll() is not None:
-    #                 print("流傳輸進程已結束")
-    #                 break
-
-    #     except KeyboardInterrupt:
-    #         print("用戶中斷了流傳輸")
-    #     except Exception as e:
-    #         print(f"發生錯誤：{str(e)}")
-    #     finally:
-    #         if ffmpeg_process.poll() is None:
-    #             print("正在停止流傳輸進程")
-    #             ffmpeg_process.terminate()
-    #             ffmpeg_process.wait()
-
-    # def check_camera_online(self, rtmp_url):
-    #     """
-    #     檢查攝像機是否在線（偵測到串流內容）
-    #     """
-    #     try:
-    #         cap = cv2.VideoCapture(rtmp_url)
-    #         if not cap.isOpened():
-    #             return False
-    #         ret, frame = cap.read()
-    #         cap.release()
-    #         return ret and frame is not None
-    #     except Exception as e:
-    #         self.logger.error(f"檢查攝像機 {rtmp_url} 在線狀態時發生錯誤：{str(e)}")
-    #         return False
-
-    # @staticmethod
-    # def check_camera_online(rtmp_url, timeout = 1.0):
-    #     """
-    #     使用 Socket 測試 RTMP 主機連通性以加速離線檢測。
-    #     """
-    #     try:
-    #         parsed_url = urlparse(rtmp_url)
-    #         host, port = parsed_url.hostname, parsed_url.port or 1935  # 預設 RTMP 端口
-    #         with socket.create_connection((host, port), timeout=timeout):
-    #             return True
-    #     except (socket.timeout, OSError):
-    #         return False
-
     @staticmethod
     def check_camera_online(rtmp_url, timeout = 4):
         """
@@ -582,8 +433,6 @@ class VideoCapService:
         except Exception as e:
             print(f"FFmpeg 檢測錯誤：{e}")
             return False
-
-
 
     def _cleanup_resources(self, rtmp_url):
         """
