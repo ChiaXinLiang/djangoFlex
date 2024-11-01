@@ -70,6 +70,8 @@ my_project_visualized.dot
 my_project_visualized.png
 myapp_models.dot
 myapp_models.png
+_services
+migrations/
 
 # Flask stuff:
 instance/
@@ -164,3 +166,5 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 test/video/06_04_08_26_24_s0s_1x_1000s.mp4
+
+volume/
