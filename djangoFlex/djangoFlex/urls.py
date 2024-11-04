@@ -42,8 +42,5 @@ urlpatterns = [
     re_path(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     path('admin/', admin.site.urls),
     path('servers/', include('djangoFlex_servers.urls')),  # Update this line
-    path('servers/rabbitmq_dashboard/', RedirectView.as_view(url=f'http://{settings.SERVERS_CONFIG["RABBITMQ_HOST"]}:{settings.SERVERS_CONFIG["RABBITMQ_DASHBOARD_PORT"]}/', permanent=False), name='rabbitmq_management'),
-    path('servers/mlflow_dashboard/', RedirectView.as_view(url=f'http://{settings.SERVERS_CONFIG["MLFLOW_SERVER_HOST"]}:{settings.SERVERS_CONFIG["MLFLOW_SERVER_PORT"]}/', permanent=False), name='mlflow_ui'),
-    path('servers/srs_dashboard/', RedirectView.as_view(url=f'http://{settings.SERVERS_CONFIG["SRS_SERVER_HOST"]}:{settings.SERVERS_CONFIG["SRS_SERVER_PORT"]}/', permanent=False), name='srs_ui'),
-    path('rabbitmq_client/', include('clients.rabbitmq_client.urls')),
+#    path('rabbitmq_client/', include('clients.rabbitmq_client.urls')),
 ]

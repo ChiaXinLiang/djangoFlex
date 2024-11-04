@@ -1,46 +1,86 @@
 import cv2
 import time
 import threading
-import logging
-from concurrent.futures import ThreadPoolExecutor
+from ..models import VideoCapConfig, CurrentVideoClip, CameraList
 from django.db import transaction
 from django.utils import timezone
-from ..models import VideoCapConfig, CurrentFrame
-
-logger = logging.getLogger(__name__)
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+import os
+from datetime import timedelta, datetime
+import subprocess
+import json
+import shutil
+import pytz
+import re
+import logging
+import ssl
+import socket
+from urllib.parse import urlparse
 
 class VideoCapService:
     def __init__(self):
+        """
+        初始化 VideoCapService 類。
+        設置各種配置參數，創建必要的目錄，並加載配置。
+        """
         self.configs = {}
         self.caps = {}
         self.running = {}
         self.capture_threads = {}
-        self.executor = ThreadPoolExecutor(max_workers=10)
         self.max_reconnect_attempts = 5
-        self.reconnect_timeout = 5  # seconds
+        self.reconnect_timeout = 5
+        self.executor = ThreadPoolExecutor(max_workers=10)
+        self.fps = 15
+        self.frame_interval = 1 / self.fps
+        self.video_clip_duration = 1
+        self.check_interval = 0.1
+        self.video_clip_dir = os.path.join('tmp', 'video_clip')
+        self.resolution = (1280, 720)
+        self.gop_length = 15
+        self.hls_time = 2
+        os.makedirs(self.video_clip_dir, exist_ok=True)
         self._load_configs()
-        logger.info("VideoCapService initialized")
+        self.logger = logging.getLogger(__name__)
+        self.stream_processes = {}
+        self.stream_threads = {}
+
+    @staticmethod
+    @transaction.atomic
+    def reset_video_cap_system():
+        """
+        重置視頻捕獲系統。
+        刪除所有當前視頻片段並將所有配置設置為非活動狀態。
+        """
+        from ..models import VideoCapConfig, CurrentVideoClip
+        try:
+            CurrentVideoClip.objects.all().delete()
+            VideoCapConfig.objects.update(is_active=False)
+        except Exception as e:
+            logging.error(f"Error resetting video cap system: {str(e)}")
 
     def _load_configs(self):
+        """
+        從數據庫加載活動的視頻捕獲配置。
+        """
         try:
             for config in VideoCapConfig.objects.filter(is_active=True):
                 self.configs[config.rtmp_url] = config
                 self.running[config.rtmp_url] = False
-                self.start_server(config.rtmp_url)
-            logger.info("Configurations loaded successfully")
         except Exception as e:
-            logger.error(f"Error loading configurations: {str(e)}")
+            self.logger.error(f"Error loading configs: {str(e)}")
 
     def start_server(self, rtmp_url):
+        """
+        啟動指定 RTMP URL 的視頻捕獲服務。
+        """
         if rtmp_url in self.running and self.running[rtmp_url]:
-            logger.info(f"Server for {rtmp_url} is already running")
             return False, "Server already running"
 
         config, created = VideoCapConfig.objects.get_or_create(rtmp_url=rtmp_url)
         if created:
             config.name = f"Config_{config.id}"
             config.save()
-            logger.info(f"New configuration created for {rtmp_url}")
 
         self.configs[rtmp_url] = config
         self.running[rtmp_url] = True
@@ -51,171 +91,289 @@ class VideoCapService:
         self.capture_threads[rtmp_url] = threading.Thread(target=self._capture_loop, args=(rtmp_url,))
         self.capture_threads[rtmp_url].start()
 
-        logger.info(f"Server started for {rtmp_url}")
-        return True, "Server started successfully"
+        # 更新 CameraList 狀態
+        CameraList.objects.filter(camera_url=rtmp_url).update(camera_status=True)
+
+        return True, "錄影開始 Server started successfully."
 
     def stop_server(self, rtmp_url):
-        if rtmp_url not in self.running or not self.running[rtmp_url]:
-            logger.warning(f"Server for {rtmp_url} is not running")
-            return False, "Server not running"
+        """
+        停止指定 RTMP URL 的視頻捕獲服務。
+        """
+        if rtmp_url not in self.running:
+            return False, "伺服器未找到"
 
         self.running[rtmp_url] = False
-        if rtmp_url in self.capture_threads:
-            self.capture_threads[rtmp_url].join()
-            del self.capture_threads[rtmp_url]
-            logger.info(f"Capture thread for {rtmp_url} stopped")
 
-        if rtmp_url in self.caps:
-            self.caps[rtmp_url].release()
-            del self.caps[rtmp_url]
-            logger.info(f"Video capture for {rtmp_url} released")
+        # 等待捕獲線程結束
+        if rtmp_url in self.capture_threads:
+            try:
+                self.capture_threads[rtmp_url].join(timeout=10)
+                if self.capture_threads[rtmp_url].is_alive():
+                    self.logger.warning(f"線程 {rtmp_url} 未在指定時間內停止")
+            except Exception as e:
+                self.logger.error(f"停止線程 {rtmp_url} 時發生錯誤: {str(e)}")
+            finally:
+                del self.capture_threads[rtmp_url]
+
+        # 檢查並釋放捕獲對象
+        if rtmp_url in self.caps and self.caps[rtmp_url] is not None:
+            try:
+                self.caps[rtmp_url].release()
+            except Exception as e:
+                self.logger.error(f"釋放捕獲對象 {rtmp_url} 時發生錯誤: {str(e)}")
+            finally:
+                del self.caps[rtmp_url]
 
         with transaction.atomic():
-            config = self.configs[rtmp_url]
-            config.is_active = False
-            config.save()
-            CurrentFrame.objects.filter(config=config).delete()
-            logger.info(f"Configuration for {rtmp_url} deactivated and current frames deleted")
+            config = self.configs.get(rtmp_url)
+            if config:
+                config.is_active = False
+                config.save()
+                CurrentVideoClip.objects.filter(config=config).delete()
 
-        logger.info(f"Server stopped for {rtmp_url}")
-        return True, "Server stopped successfully"
+        hls_output_dir = os.path.join(self.video_clip_dir, f"{rtmp_url.split('/')[-1]}_hls")
+        if os.path.exists(hls_output_dir):
+            try:
+                shutil.rmtree(hls_output_dir)
+            except Exception as e:
+                self.logger.error(f"刪除目錄 {hls_output_dir} 時發生錯誤: {str(e)}")
+
+        if rtmp_url in self.configs:
+            del self.configs[rtmp_url]
+
+        # 更新 CameraList 狀態
+        CameraList.objects.filter(camera_url=rtmp_url).update(camera_status=False)
+
+        return True, "伺服器已成功停止"
 
     def check_server_status(self, rtmp_url):
-        status = self.running.get(rtmp_url, False)
-        logger.info(f"Server status for {rtmp_url}: {'Running' if status else 'Not running'}")
-        return status
+        """
+        檢查指定 RTMP URL 的服務運行狀態。
+        """
+        is_running = self.running.get(rtmp_url, False)
+        is_active = VideoCapConfig.objects.filter(rtmp_url=rtmp_url, is_active=True).exists()
+        camera_status = CameraList.objects.filter(camera_url=rtmp_url, camera_status=True).exists()
+        return is_running and is_active and camera_status
 
     def _initialize_capture(self, rtmp_url):
+        """
+        初始化視頻捕獲對象。
+        設置捕獲參數如幀率、分辨率等，並檢查捕獲對象是否成功打開。
+        """
         if rtmp_url in self.caps and self.caps[rtmp_url] is not None:
             self.caps[rtmp_url].release()
-            logger.info(f"Existing capture for {rtmp_url} released")
-        
-        # Handle '0' as a special case for local camera
+
         cap_source = 0 if rtmp_url == '0' else rtmp_url
         try:
             self.caps[rtmp_url] = cv2.VideoCapture(cap_source)
             self.caps[rtmp_url].set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            self.caps[rtmp_url].set(cv2.CAP_PROP_FPS, self.fps)
+            self.caps[rtmp_url].set(cv2.CAP_PROP_FRAME_WIDTH, self.resolution[0])
+            self.caps[rtmp_url].set(cv2.CAP_PROP_FRAME_HEIGHT, self.resolution[1])
             if not self.caps[rtmp_url].isOpened():
                 raise Exception("Failed to open video capture")
-            logger.info(f"Video capture initialized for {rtmp_url}")
         except Exception as e:
-            logger.error(f"Failed to initialize video capture for {rtmp_url}: {str(e)}")
+            self.logger.error(f"Error initializing capture for {rtmp_url}: {str(e)}")
             self.caps[rtmp_url] = None
 
     def _capture_loop(self, rtmp_url):
+        """
+        視頻捕獲的主循環。
+        持續從視頻流中讀取幀，處理重連邏輯，並更新視頻片段。
+        同時啟動 FFmpeg 進程來處理 HLS 輸出。
+        """
+        # 檢查 rtmp_url 是否在 self.configs 中
+        if rtmp_url not in self.configs:
+            self.logger.error(f"配置未找到：{rtmp_url}")
+            return
+
         config = self.configs[rtmp_url]
         reconnect_start_time = None
         reconnect_attempts = 0
-        logger.info(f"Capture loop started for {rtmp_url}")
-        while self.running[rtmp_url]:
-            if rtmp_url in self.caps and self.caps[rtmp_url] is not None and self.caps[rtmp_url].isOpened():
-                if self._process_frame(rtmp_url):
-                    reconnect_start_time = None
-                    reconnect_attempts = 0
+        last_frame_time = time.time()
+        last_check_time = time.time()
+
+        hls_output_dir = os.path.join(self.video_clip_dir, f"{rtmp_url.split('/')[-1]}_hls")
+        os.makedirs(hls_output_dir, exist_ok=True)
+        hls_output = os.path.join(hls_output_dir, 'index.m3u8')
+
+        ffmpeg_command = [
+            'ffmpeg',
+            '-y',
+            '-i', rtmp_url,
+            '-c:v', 'libx264',
+            '-preset', 'ultrafast',
+            '-tune', 'zerolatency',
+            '-r', str(self.fps),
+            '-g', str(self.gop_length),
+            '-keyint_min', str(self.gop_length),
+            '-force_key_frames', f"expr:if(isnan(prev_forced_n),1,eq(n,prev_forced_n+{self.gop_length}))",
+            '-s', f'{self.resolution[0]}x{self.resolution[1]}',
+            '-f', 'hls',
+            '-hls_time', str(self.hls_time),
+            '-hls_segment_type', 'mpegts',
+            '-hls_flags', 'independent_segments',
+            '-strftime', '1',
+            '-strftime_mkdir', '1',
+            '-hls_segment_filename', os.path.join(hls_output_dir, f'%Y%m%d%H%M_%s.ts'),
+            '-loglevel', 'warning',  # Set log level to warning
+            '-err_detect', 'ignore_err',  # Ignore decoding errors
+            hls_output
+        ]
+
+        ffmpeg_process = None
+        try:
+            ffmpeg_process = subprocess.Popen(ffmpeg_command, stderr=subprocess.PIPE, universal_newlines=True)
+
+            def log_stderr(stderr):
+                for line in iter(stderr.readline, ''):
+                    if line.strip():
+                        self.logger.warning(f"FFmpeg: {line.strip()}")
+
+            threading.Thread(target=log_stderr, args=(ffmpeg_process.stderr,), daemon=True).start()
+
+            while self.running[rtmp_url]:
+                if rtmp_url in self.caps and self.caps[rtmp_url] is not None and self.caps[rtmp_url].isOpened():
+                    ret, frame = self.caps[rtmp_url].read()
+                    current_time = time.time()
+
+                    if ret:
+                        last_frame_time = current_time
+                        reconnect_start_time = None
+                        reconnect_attempts = 0
+
+                        if current_time - last_check_time >= self.check_interval:
+                            self._check_and_update_video_clip(rtmp_url, hls_output_dir)
+                            last_check_time = current_time
+
+                    elif current_time - last_frame_time > 1:
+                        if reconnect_start_time is None:
+                            reconnect_start_time = current_time
+                            reconnect_attempts += 1
+                        self._reconnect(rtmp_url)
                 else:
                     if reconnect_start_time is None:
                         reconnect_start_time = time.time()
                         reconnect_attempts += 1
-            else:
-                if reconnect_start_time is None:
-                    reconnect_start_time = time.time()
-                    reconnect_attempts += 1
-                    logger.warning(f"Connection lost for {rtmp_url}, attempting to reconnect")
-            
-            if reconnect_start_time is not None:
-                elapsed_time = time.time() - reconnect_start_time
-                if elapsed_time > self.reconnect_timeout or reconnect_attempts > self.max_reconnect_attempts:
-                    logger.error(f"Failed to reconnect to {rtmp_url} after {elapsed_time:.2f} seconds and {reconnect_attempts} attempts. Setting server to inactive.")
-                    self._set_inactive(rtmp_url)
-                    break
-                else:
                     self._reconnect(rtmp_url)
-            
-            time.sleep(config.frame_interval)
-        logger.info(f"Capture loop ended for {rtmp_url}")
 
-    def _process_frame(self, rtmp_url):
-        if rtmp_url not in self.caps or self.caps[rtmp_url] is None or not self.caps[rtmp_url].isOpened():
-            logger.warning(f"VideoCapture is not initialized or opened for {rtmp_url}")
-            return False
+                if reconnect_start_time is not None:
+                    elapsed_time = time.time() - reconnect_start_time
+                    if elapsed_time > self.reconnect_timeout or reconnect_attempts > self.max_reconnect_attempts:
+                        self._set_inactive(rtmp_url)
+                        break
 
-        try:
-            ret, frame = self.caps[rtmp_url].read()
-            if not ret:
-                raise Exception("Failed to capture frame")
-            
-            self.update_frame(rtmp_url, frame)
-            self.configs[rtmp_url].consecutive_errors = 0  # Reset error count on success
-            logger.debug(f"Frame processed successfully for {rtmp_url}")
-            return True
         except Exception as e:
-            logger.warning(f"Error processing frame for {rtmp_url}: {str(e)}")
-            self.configs[rtmp_url].consecutive_errors += 1
-            return False
+            self.logger.error(f"捕獲循環中發生錯誤 {rtmp_url}: {str(e)}")
+        finally:
+            if ffmpeg_process:
+                ffmpeg_process.terminate()
+                ffmpeg_process.wait()
+
+        # 在循環結束後清理資源
+        self._cleanup_resources(rtmp_url)
+
+    def _get_frame_size(self, rtmp_url):
+        """
+        獲取指定 RTMP URL 的幀大小（分辨率）。
+        """
+        return self.resolution
 
     def _reconnect(self, rtmp_url):
-        logger.info(f"Attempting to reconnect to video source for {rtmp_url}")
+        """
+        嘗試重新連接視頻捕獲對象。
+        釋放當前捕獲對象並重新初始化。
+        """
         if rtmp_url in self.caps and self.caps[rtmp_url] is not None:
             self.caps[rtmp_url].release()
         self.caps[rtmp_url] = None
-        time.sleep(1)  # Wait a bit before reconnecting
-        if self.caps[rtmp_url] is None or not self.caps[rtmp_url].isOpened():
-            logger.error(f"Failed to reconnect to video source for {rtmp_url}")
-            return False
-        else:
-            logger.info(f"Successfully reconnected to video source for {rtmp_url}")
-            self.configs[rtmp_url].consecutive_errors = 0
-            return True
+        time.sleep(1)
+        self._initialize_capture(rtmp_url)
+        return self.caps[rtmp_url] is not None and self.caps[rtmp_url].isOpened()
 
     def _set_inactive(self, rtmp_url):
-        logger.info(f"Setting server to inactive for {rtmp_url}")
+        """
+        將指定的 RTMP URL 配置設置為非活動狀態。
+        清理相關資源和數據庫記錄。
+        """
         with transaction.atomic():
             config = self.configs[rtmp_url]
             config.is_active = False
             config.save()
-            CurrentFrame.objects.filter(config=config).delete()
-            logger.info(f"Configuration for {rtmp_url} set to inactive and current frames deleted")
+
+            CurrentVideoClip.objects.filter(config=config).delete()
 
         self.running[rtmp_url] = False
         if rtmp_url in self.caps and self.caps[rtmp_url] is not None:
             self.caps[rtmp_url].release()
         self.caps[rtmp_url] = None
-        logger.info(f"Video capture for {rtmp_url} released")
 
         if rtmp_url in self.capture_threads:
             del self.capture_threads[rtmp_url]
-            logger.info(f"Capture thread for {rtmp_url} removed")
 
-    def update_frame(self, rtmp_url, frame):
+        hls_output_dir = os.path.join(self.video_clip_dir, f"{rtmp_url.split('/')[-1]}_hls")
+        if os.path.exists(hls_output_dir):
+            shutil.rmtree(hls_output_dir)
+
+    async def update_frame(self, rtmp_url, frame):
+        """
+        異步更新當前幀。
+        將幀編碼為 JPEG 並存儲在 Redis 中。
+        """
         if frame is None:
-            logger.warning(f"Received None frame for {rtmp_url}, skipping update")
             return
-        
+
         _, buffer = cv2.imencode('.jpg', frame)
         frame_bytes = buffer.tobytes()
-        
-        with transaction.atomic():
-            config = self.configs[rtmp_url]
-            current_frame, created = CurrentFrame.objects.get_or_create(config=config)
-            current_frame.frame_data = frame_bytes
-            current_frame.timestamp = timezone.now()
-            current_frame.save()
-            logger.debug(f"Frame updated for {rtmp_url}")
+
+        await asyncio.to_thread(self.redis_client.set, f"video_cap_service:current_image:{rtmp_url}", frame_bytes)
+
+    def _check_and_update_video_clip(self, rtmp_url, hls_output_dir):
+        """
+        檢查並更新視頻片段。
+        查找最新的 TS 文件並在數據庫中創建相應的 CurrentVideoClip 記錄。
+        """
+        config = self.configs[rtmp_url]
+
+        try:
+            ts_files = [f for f in os.listdir(hls_output_dir) if f.endswith('.ts')]
+            if ts_files:
+                latest_ts_file = max(ts_files, key=lambda f: os.path.getmtime(os.path.join(hls_output_dir, f)))
+                ts_file_path = os.path.join(hls_output_dir, latest_ts_file)
+
+                existing_clip = CurrentVideoClip.objects.filter(config=config, clip_path=ts_file_path).first()
+                if not existing_clip:
+                    if os.path.exists(ts_file_path):
+                        ts_file_timestamp = datetime.fromtimestamp(os.path.getmtime(ts_file_path))
+                        ts_file_timestamp = pytz.timezone('UTC').localize(ts_file_timestamp)
+
+                        with transaction.atomic():
+                            CurrentVideoClip.objects.create(
+                                config=config,
+                                clip_path=ts_file_path,
+                                start_time=ts_file_timestamp,
+                                end_time=ts_file_timestamp + timedelta(seconds=self.video_clip_duration),
+                                duration=self.video_clip_duration
+                            )
+        except Exception as e:
+            self.logger.error(f"Error checking and updating video clip for {rtmp_url}: {str(e)}")
 
     def __del__(self):
-        logger.info("VideoCapService destructor called")
+        """
+        析構函數。
+        確保所有運行中的服務在對象被銷毀時停止。
+        """
         for rtmp_url in list(self.running.keys()):
             if self.running[rtmp_url]:
                 self.stop_server(rtmp_url)
-        self.executor.shutdown(wait=True)
-        logger.info("ThreadPoolExecutor shut down")
-
-        with transaction.atomic():
-            CurrentFrame.objects.filter(config__in=self.configs.values()).delete()
-            logger.info("All current frames deleted")
-        logger.info("VideoCapService destroyed")
+        for rtmp_url in list(self.stream_processes.keys()):
+            self._stop_stream(rtmp_url)
 
     def list_running_threads(self):
+        """
+        列出所有正在運行的捕獲線程的信息。
+        """
         running_threads = []
         for rtmp_url, thread in self.capture_threads.items():
             running_threads.append({
@@ -225,3 +383,73 @@ class VideoCapService:
                 'is_alive': thread.is_alive()
             })
         return running_threads
+
+    def start_all_cameras(self):
+        """
+        啟動 CameraList 中所有的攝像頭
+        """
+        cameras = CameraList.objects.all()
+        started_count = 0
+        for camera in cameras:
+            success, _ = self.start_server(camera.camera_url)
+            if success:
+                started_count += 1
+                camera.camera_status = True
+                camera.save()
+        return started_count, cameras.count()
+
+    def stop_all_servers(self):
+        """
+        停止所有正在運行的視頻捕獲服務。
+        """
+        stopped_count = 0
+        for rtmp_url in list(self.running.keys()):
+            if self.running[rtmp_url]:
+                success, _ = self.stop_server(rtmp_url)
+                if success:
+                    stopped_count += 1
+                    camera = CameraList.objects.filter(camera_url=rtmp_url).first()
+                    if camera:
+                        camera.camera_status = False
+                        camera.save()
+        return stopped_count
+
+    @staticmethod
+    def check_camera_online(rtmp_url, timeout = 4):
+        """
+        使用 FFmpeg 測試 RTMP 串流是否在線。
+        """
+        try:
+            # 呼叫 ffmpeg 並限制在 timeout 時間內返回
+            command = [
+                "ffmpeg", "-i", rtmp_url,
+                "-t", "2",  # 最多讀取 2 秒
+                "-f", "null", "-"  # 不輸出結果
+            ]
+            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+            return result.returncode == 0  # returncode 為 0 表示串流有效
+        except subprocess.TimeoutExpired:
+            return False
+        except Exception as e:
+            print(f"FFmpeg 檢測錯誤：{e}")
+            return False
+
+    def _cleanup_resources(self, rtmp_url):
+        """
+        清理與特定 RTMP URL 相關的資源
+        """
+        if rtmp_url in self.caps and self.caps[rtmp_url] is not None:
+            self.caps[rtmp_url].release()
+            del self.caps[rtmp_url]
+
+        if rtmp_url in self.running:
+            del self.running[rtmp_url]
+
+        if rtmp_url in self.configs:
+            del self.configs[rtmp_url]
+
+        # 更新 CameraList 狀態
+        CameraList.objects.filter(camera_url=rtmp_url).update(camera_status=False)
+
+        self.logger.info(f"已清理 {rtmp_url} 的資源")
+
