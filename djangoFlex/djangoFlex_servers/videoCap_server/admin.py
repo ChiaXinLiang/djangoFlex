@@ -4,33 +4,14 @@ from django.utils.html import format_html
 from django.urls import path, reverse
 import base64
 
-from .models import CurrentFrame, VideoCapConfig, CurrentVideoClip, AIInferenceResult, CameraList
-from .services.videoCap_service import VideoCapService
+# from .services.videoCap_service import VideoCapService
+from .services.video_cap_manager import VideoCapManager
+
+from .models import VideoCapConfig, CurrentVideoClip, CameraList
 from ..visionAI_server.models import CameraDrawingStatus
 from ..visionAI_server.api_draw import DrawView
+from .views import VideoCapServerView
 
-@admin.register(CurrentFrame)
-class CurrentFrameAdmin(admin.ModelAdmin):
-    def frame_preview(self, obj):
-        if obj.frame_data:
-            # Convert binary image data to a base64 encoded string
-            image_base64 = base64.b64encode(obj.frame_data).decode('ascii')
-            # Render the image in the admin list display
-            return format_html('<img src="data:image/jpeg;base64,{}" width="300" height="auto" />', image_base64)
-        return "No image"
-    frame_preview.short_description = 'Frame Preview'
-
-    def rtmp_url(self, obj):
-        if obj.config:
-            return obj.config.rtmp_url
-        return "No config"
-
-    def frame_time(self, obj):
-        return obj.timestamp.strftime("%Y-%m-%d %H:%M:%S")
-    frame_time.short_description = 'Frame Time'
-
-    list_display = ('frame_preview', 'rtmp_url', 'frame_time')
-    readonly_fields = ('frame_preview', 'rtmp_url', 'frame_time')
 
 @admin.register(VideoCapConfig)
 class VideoCapConfigAdmin(admin.ModelAdmin):
@@ -40,11 +21,6 @@ class VideoCapConfigAdmin(admin.ModelAdmin):
 class CurrentVideoClipAdmin(admin.ModelAdmin):
     list_display = ('config', 'clip_path', 'start_time', 'end_time', 'duration', 'processed')
     readonly_fields = ('duration',)
-
-@admin.register(AIInferenceResult)
-class AIInferenceResultAdmin(admin.ModelAdmin):
-    list_display = ('video_clip', 'timestamp')
-    readonly_fields = ('result_data',)
 
 @admin.register(CameraList)
 class CameraListAdmin(admin.ModelAdmin):
@@ -65,14 +41,14 @@ class CameraListAdmin(admin.ModelAdmin):
         status = VideoCapConfig.objects.filter(rtmp_url=obj.camera_url, is_active=True).exists()
         if status:
             return format_html('<a class="button" href="{}" onclick="return confirm(\'確定要停止錄影嗎？\')">停止</a>',
-                               reverse('admin:stop_camera', args=[obj.camera_url]))
+                               reverse('admin:stop_capture', args=[obj.camera_url]))
         else:
             return format_html('<a class="button" href="{}" onclick="return confirm(\'確定要啟動錄影嗎？\')">啟動</a>',
-                               reverse('admin:start_camera', args=[obj.camera_url]))
+                               reverse('admin:start_capture', args=[obj.camera_url]))
     start_stop_button.short_description = '錄影操作'
 
     def camera_online_status(self, obj):
-        is_online = VideoCapService().check_camera_online(rtmp_url=obj.camera_url)
+        is_online = VideoCapManager().check_camera_online(rtmp_url=obj.camera_url)
         print('is_online:', is_online)
         return format_html('<span style="color: {};">{}</span>',
                            'green' if is_online else 'red',
@@ -99,29 +75,23 @@ class CameraListAdmin(admin.ModelAdmin):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            path('<path:camera_url>/start/', self.admin_site.admin_view(self.start_camera), name='start_camera'),
-            path('<path:camera_url>/stop/', self.admin_site.admin_view(self.stop_camera), name='stop_camera'),
+            path('<path:camera_url>/start_capture/', self.admin_site.admin_view(self.start_video_cap), name='start_capture'),
+            path('<path:camera_url>/stop_capture/', self.admin_site.admin_view(self.stop_video_cap), name='stop_capture'),
             path('<path:camera_url>/start_drawing/', self.admin_site.admin_view(self.start_drawing), name='start_drawing'),
             path('<path:camera_url>/stop_drawing/', self.admin_site.admin_view(self.stop_drawing), name='stop_drawing'),
         ]
         return custom_urls + urls
 
-    def start_camera(self, request, camera_url):
-        from .views import VideoCapServerView
+    def start_video_cap(self, request, camera_url):
         view = VideoCapServerView()
         response = view.post(request, action='start', rtmp_url=camera_url)
         self.message_user(request, response.data['message'])
-        # 確保更新 VideoCapConfig 的狀態
-        VideoCapConfig.objects.filter(rtmp_url=camera_url).update(is_active=True)
         return HttpResponseRedirect(reverse('admin:videoCap_server_cameralist_changelist'))
 
-    def stop_camera(self, request, camera_url):
-        from .views import VideoCapServerView
+    def stop_video_cap(self, request, camera_url):
         view = VideoCapServerView()
         response = view.post(request, action='stop', rtmp_url=camera_url)
         self.message_user(request, response.data['message'])
-        # 確保更新 VideoCapConfig 的狀態
-        VideoCapConfig.objects.filter(rtmp_url=camera_url).update(is_active=False)
         return HttpResponseRedirect(reverse('admin:videoCap_server_cameralist_changelist'))
 
     def start_drawing(self, request, camera_url):
