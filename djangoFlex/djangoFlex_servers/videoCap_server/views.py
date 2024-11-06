@@ -5,7 +5,7 @@ from rest_framework import status
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.utils.decorators import method_decorator
-from .services.video_cap_manager import VideoCapManager
+from .services.videoCap_service import VideoCapService
 from .services.cameraList_service import CameraListService
 from .models import VideoCapConfig, CameraList
 import time
@@ -17,7 +17,7 @@ class VideoCapServerView(APIView):
     @classmethod
     def get_video_cap_service(cls):
         if cls.video_cap_service is None:
-            cls.video_cap_service = VideoCapManager()
+            cls.video_cap_service = VideoCapService()
         return cls.video_cap_service
 
     @method_decorator(name='post', decorator=swagger_auto_schema(
@@ -66,25 +66,24 @@ class VideoCapServerView(APIView):
             return Response({"error": "此操作需要 RTMP URL"}, status=status.HTTP_400_BAD_REQUEST)
 
         if action == 'start':
-            success, message = video_cap_service.start_video_cap_service(rtmp_url)
-            VideoCapConfig.objects.filter(rtmp_url=rtmp_url).update(is_active=True)
+            success, message = video_cap_service.start_server(rtmp_url)
             is_running = success
 
         elif action == 'stop':
-            success, message = video_cap_service.stop_video_cap_service(rtmp_url)
-            VideoCapConfig.objects.filter(rtmp_url=rtmp_url).update(is_active=False)
-            is_running = video_cap_service.get_service_running_status(rtmp_url)
+            success, message = video_cap_service.stop_server(rtmp_url)
+            CameraList.objects.filter(camera_url=rtmp_url).update(camera_status=False)
+            is_running = video_cap_service.check_server_status(rtmp_url)
 
         elif action == 'status':
-            is_running = video_cap_service.get_service_running_status(rtmp_url)
+            is_running = video_cap_service.check_server_status(rtmp_url)
             message = f"Video capture server for {rtmp_url} is {'running' if is_running else 'not running'}"
         elif action == 'start_all':
-            started_count, total_count = video_cap_service.start_all_video_cap_service()
+            started_count, total_count = video_cap_service.start_all_cameras()
             message = f"Started {started_count} out of {total_count} video capture servers"
             is_running = started_count > 0
             success = True
         elif action == 'stop_all':
-            stopped_count = video_cap_service.stop_all_video_cap_service()
+            stopped_count = video_cap_service.stop_all_servers()
             message = f"Stopped {stopped_count} video capture servers"
             is_running = False
             success = True

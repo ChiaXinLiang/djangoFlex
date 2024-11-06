@@ -18,6 +18,25 @@ class VideoCapConfig(models.Model):
     def __str__(self):
         return f"VideoCapConfig: {self.name}, RTMP URL={self.rtmp_url}, Active={self.is_active}"
 
+class CurrentFrame(models.Model):
+    id = models.AutoField(primary_key=True)
+    config = models.ForeignKey(VideoCapConfig, on_delete=models.CASCADE, related_name='frames')
+    frame_data = models.BinaryField(blank=True, null=True)
+    timestamp = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "Frame"
+        verbose_name_plural = "Frames"
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"Frame for {self.config.rtmp_url} at {self.timestamp}"
+
+    def save(self, *args, **kwargs):
+        self.timestamp = timezone.now()
+        super().save(*args, **kwargs)
+        # Save the frame data to Redis server
+
 class CurrentVideoClip(models.Model):
     config = models.ForeignKey(VideoCapConfig, on_delete=models.CASCADE, related_name='video_clips')
     clip_path = models.CharField(max_length=255)  # Path to the stored video clip
@@ -38,6 +57,19 @@ class CurrentVideoClip(models.Model):
         if self.end_time and self.start_time:
             self.duration = (self.end_time - self.start_time).total_seconds()
         super().save(*args, **kwargs)
+
+class AIInferenceResult(models.Model):
+    video_clip = models.ForeignKey(CurrentVideoClip, on_delete=models.CASCADE, related_name='ai_results')
+    result_data = models.JSONField()  # Store AI results as JSON
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "AI Inference Result"
+        verbose_name_plural = "AI Inference Results"
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"AI Result for {self.video_clip} at {self.timestamp}"
 
 class CameraList(models.Model):
     camera_name = models.CharField(max_length=100, unique=True)
