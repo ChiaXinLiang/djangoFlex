@@ -64,10 +64,26 @@ class VideoProcessingService:
             return False, f"Error stopping draw service: {str(e)}"
 
     def _draw_loop(self, rtmp_url):
+        """
+        管理給定 RTMP URL 的視頻處理循環。
+
+        此方法嘗試啟動並維護一個 FFmpeg 過程以進行視頻處理。
+        如果失敗，它會重試指定次數。在每次嘗試期間，
+        它處理視頻剪輯，調整幀率，並將幀寫入 FFmpeg 過程。
+
+        參數:
+            rtmp_url (str): 視頻流的 RTMP URL。
+
+        引發:
+            Exception: 如果 FFmpeg 過程未運行或視頻處理在最大重試次數後失敗。
+
+        注意:
+            當循環不再運行時，此方法將停止 FFmpeg 過程。
+        """
         try:
             config = self.config_service.get_config(rtmp_url)
-            max_retries = 5
-            retry_delay = 10  # seconds
+            max_retries = 5 # 最大重試次數
+            retry_delay = 10  # 每次重試之間的延遲，seconds
 
             for attempt in range(max_retries):
                 try:
@@ -145,6 +161,10 @@ class VideoProcessingService:
                 frames, duration = self.drawing_service.read_video_frames(clip_path)
 
                 if len(frames) > 0:
+                    '''
+                    如果視頻幀數大於 0，方法會對第一幀和最後一幀進行物件檢測，並將檢測結果繪製到所有幀上。
+                    最後，方法會刪除當前視頻剪輯的資料庫記錄和實體檔案，並返回處理後的幀和持續時間。如果視頻幀數為 0，方法會返回 None。
+                    '''
                     first_frame = frames[0]
                     last_frame = frames[-1]
                     first_result = self.detection_service.detect_objects(first_frame)

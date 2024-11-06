@@ -41,6 +41,25 @@ services:
       - ${REDIS_DATA_DIR:-./volume/redis/data}:/data
     command: redis-server
 
+  django:
+    build:
+      context: .
+      dockerfile: Dockerfile.django
+    container_name: django_container
+    command: python djangoFlex/manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=djangoFlex.settings.djangoFlex
+      - PYTHONPATH=/app
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+      - srs
+
 volumes:
   postgres_data:
   redis_data:
