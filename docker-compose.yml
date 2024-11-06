@@ -31,6 +31,11 @@ services:
       - POSTGRES_DB=${POSTGRES_DATABASE:-your_postgres_database}
     volumes:
       - ${POSTGRES_DATA_DIR:-./volume/postgres/data}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: ${REDIS_DOCKER_IMAGE:-redis:6.2.4}
@@ -46,7 +51,10 @@ services:
       context: .
       dockerfile: Dockerfile.django
     container_name: django_container
-    command: python djangoFlex/manage.py runserver 0.0.0.0:8000
+    command: >
+      sh -c "python djangoFlex/manage.py makemigrations &&
+             python djangoFlex/manage.py migrate &&
+             python djangoFlex/manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app
     ports:
@@ -54,11 +62,17 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=djangoFlex.settings.djangoFlex
       - PYTHONPATH=/app
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
     depends_on:
-      - postgres
-      - redis
-      - rabbitmq
-      - srs
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      srs:
+        condition: service_started
 
 volumes:
   postgres_data:

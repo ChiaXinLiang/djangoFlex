@@ -69,8 +69,8 @@ my_project_visualized.dot
 my_project_visualized.png
 myapp_models.dot
 myapp_models.png
-/migrations/
-/_services/
+migrations/
+_services/
 
 # Flask stuff:
 instance/

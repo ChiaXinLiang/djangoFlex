@@ -47,6 +47,7 @@ class CameraList(models.Model):
     class Meta:
         verbose_name = "Camera"
         verbose_name_plural = "Camera List"
+        db_table = 'videoCap_server_cameralist'
 
     def __str__(self):
         return f"Camera: {self.camera_name}, URL={self.camera_url}, Status={self.camera_status}"
