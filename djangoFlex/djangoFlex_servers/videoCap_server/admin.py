@@ -3,6 +3,8 @@ from django.http import HttpResponseRedirect
 from django.utils.html import format_html
 from django.urls import path, reverse
 import base64
+from django.db import IntegrityError
+from django.utils import timezone
 
 # from .services.videoCap_service import VideoCapService
 from .services.video_cap_manager import VideoCapManager
@@ -130,7 +132,21 @@ class CameraListAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
-        VideoCapConfig.objects.update_or_create(
-            rtmp_url=obj.camera_url,
-            defaults={'name': obj.camera_name, 'is_active': False}
-        )
+        try:
+            VideoCapConfig.objects.update_or_create(
+                rtmp_url=obj.camera_url,
+                defaults={
+                    'name': f"camera_{VideoCapConfig.objects.count() + 1}",
+                    'is_active': False
+                }
+            )
+        except IntegrityError:
+            # 如果名稱衝突，使用時間戳來確保唯一性
+            timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+            VideoCapConfig.objects.update_or_create(
+                rtmp_url=obj.camera_url,
+                defaults={
+                    'name': f"camera_{timestamp}",
+                    'is_active': False
+                }
+            )

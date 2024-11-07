@@ -9,7 +9,7 @@ from djangoFlex.config.load_config_from_yaml import load_config_from_yaml
 # ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
 
 # MLflow Configuration
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
 MLFLOW_BACKEND_STORE = os.getenv("MLFLOW_BACKEND_STORE", "mlruns")
 MLFLOW_SERVER_PORT = int(os.getenv("MLFLOW_SERVER_PORT", "5000"))
 MLFLOW_SERVER_HOST = os.getenv("MLFLOW_SERVER_HOST", "localhost")
@@ -30,8 +30,10 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "amqp://guest:guest@localhost
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0")  # 改為容器名稱
 
 # SRS (Simple RTMP Server) Configuration
-# SRS_SERVER_HOST = os.getenv("SRS_SERVER_HOST", "localhost")
-SRS_SERVER_HOST = os.getenv("SRS_SERVER_HOST", "srs")  # 改為容器名稱
+IS_DOCKER = os.getenv('IS_DOCKER', 'False') == 'True'
+NETWORK_NAME = os.getenv('NETWORK_NAME', 'djangoflex-network')
+SRS_HOST = 'srs' if IS_DOCKER else 'localhost'
+SRS_SERVER_HOST = os.getenv("SRS_SERVER_HOST", SRS_HOST)
 SRS_SERVER_PORT = int(os.getenv("SRS_SERVER_PORT", "1935"))
 SRS_HTTP_SERVER_PORT = int(os.getenv("SRS_HTTP_SERVER_PORT", "8080"))
 

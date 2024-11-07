@@ -44,10 +44,18 @@ class HLSStreamService:
                 self.logger.error(f"刪除目錄 {hls_output_dir} 時發生錯誤: {str(e)}")
 
     def _build_ffmpeg_command(self, rtmp_url, hls_output):
+        # 檢查是否在 Docker 環境中
+        is_docker = os.getenv('IS_DOCKER', 'False') == 'True'
+
+        # 如果在 Docker 中，將 localhost 替換為 srs 容器名稱
+        input_url = rtmp_url
+        if is_docker and 'localhost' in rtmp_url:
+            input_url = rtmp_url.replace('localhost', 'srs')
+
         return [
             'ffmpeg',
             '-y',
-            '-i', rtmp_url,
+            '-i', input_url,
             '-c:v', 'libx264',
             '-preset', 'ultrafast',
             '-tune', 'zerolatency',

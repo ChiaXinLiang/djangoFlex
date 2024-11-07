@@ -1,4 +1,5 @@
 from ...videoCap_server.models import VideoCapConfig
+from django.conf import settings
 
 class ConfigurationService:
     def __init__(self):
@@ -10,7 +11,7 @@ class ConfigurationService:
             for config in VideoCapConfig.objects.filter(is_active=True):
                 self.configs[config.rtmp_url] = {
                     'rtmp_url': config.rtmp_url,
-                    'output_url': f"rtmp://localhost/live/result_{config.rtmp_url.split('/')[-1]}",
+                    'output_url': f"rtmp://{settings.SRS_HOST}/live/result_{config.rtmp_url.split('/')[-1]}",
                     'is_active': True,
                     'fps': 15,
                     'frame_size': (1280, 720)

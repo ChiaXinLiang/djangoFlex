@@ -1,4 +1,5 @@
-from ..models import CameraList
+from ..models import CameraList, VideoCapConfig
+from django.db import transaction
 
 class CameraListService:
     @staticmethod
@@ -18,14 +19,20 @@ class CameraListService:
     @staticmethod
     def delete_camera(camera_url):
         """
-        從 CameraList 中刪除攝像頭
+        從 CameraList 中刪除攝像頭，同時清理相關配置
         """
         try:
-            camera = CameraList.objects.get(camera_url=camera_url)
-            camera.delete()
-            return True, f"Camera '{camera.camera_name}' deleted successfully."
+            with transaction.atomic():
+                camera = CameraList.objects.get(camera_url=camera_url)
+                # 刪除相關的 VideoCapConfig
+                VideoCapConfig.objects.filter(rtmp_url=camera_url).delete()
+                # 刪除 CameraList
+                camera.delete()
+                return True, f"Camera '{camera.camera_name}' and related configurations deleted successfully."
         except CameraList.DoesNotExist:
             return False, f"Camera with URL '{camera_url}' not found."
+        except Exception as e:
+            return False, f"Error deleting camera: {str(e)}"
 
     @staticmethod
     def get_all_cameras():

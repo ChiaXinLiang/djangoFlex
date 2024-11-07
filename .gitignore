@@ -71,6 +71,7 @@ myapp_models.dot
 myapp_models.png
 migrations/
 _services/
+test1.py
 
 # Flask stuff:
 instance/

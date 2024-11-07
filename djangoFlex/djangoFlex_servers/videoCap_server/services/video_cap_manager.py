@@ -80,17 +80,38 @@ class VideoCapManager:
             if rtmp_url in self.caps and self.caps[rtmp_url] is not None:
                 self.caps[rtmp_url].release()
 
-            cap_source = 0 if rtmp_url == '0' else rtmp_url
+            # 檢查是否在 Docker 環境中
+            is_docker = os.getenv('IS_DOCKER', 'False') == 'True'
+
+            # 如果在 Docker 中，將 localhost 替換為 srs 容器名稱
+            cap_source = rtmp_url
+            if is_docker and 'localhost' in rtmp_url:
+                cap_source = rtmp_url.replace('localhost', 'srs')
+                self.logger.info(f"Docker 環境中：將 {rtmp_url} 替換為 {cap_source}")
+            elif rtmp_url == '0':
+                cap_source = 0
+
+            self.logger.info(f"嘗試初始化視頻捕獲：{cap_source}")
             self.caps[rtmp_url] = cv2.VideoCapture(cap_source)
+
+            # 檢查 VideoCapture 是否成功創建
+            if self.caps[rtmp_url] is None:
+                raise VideoCapException("VideoCapture 對象創建失敗")
+
+            self.logger.info("設置視頻捕獲參數")
             self.caps[rtmp_url].set(cv2.CAP_PROP_BUFFERSIZE, 1)
             self.caps[rtmp_url].set(cv2.CAP_PROP_FPS, self.config.fps)
             self.caps[rtmp_url].set(cv2.CAP_PROP_FRAME_WIDTH, self.config.resolution[0])
             self.caps[rtmp_url].set(cv2.CAP_PROP_FRAME_HEIGHT, self.config.resolution[1])
 
             if not self.caps[rtmp_url].isOpened():
+                self.logger.error(f"無法開啟視頻捕獲：{cap_source}")
                 raise VideoCapException("無法開啟視頻捕獲")
+
+            self.logger.info(f"視頻捕獲初始化成功：{cap_source}")
         except Exception as e:
             self.logger.error(f"初始化捕獲 {rtmp_url} 時發生錯誤: {str(e)}")
+            self.logger.error(f"異常類型: {type(e)}")
             self.caps[rtmp_url] = None
             raise VideoCapException(f"初始化捕獲失敗: {str(e)}")
 

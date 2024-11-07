@@ -1,3 +1,9 @@
+version: "3.8"
+
+networks:
+  djangoflex-network:
+    driver: bridge
+
 services:
   rabbitmq:
     image: ${RABBITMQ_DOCKER_IMAGE:-rabbitmq:3-management}
@@ -10,6 +16,8 @@ services:
       - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-guest}
       - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST:-/}
     command: rabbitmq-server
+    networks:
+      - djangoflex-network
 
   srs:
     image: ${SRS_DOCKER_IMAGE:-ossrs/srs:5}
@@ -19,6 +27,8 @@ services:
       - "${SRS_HTTP_SERVER_PORT:-8080}:8080"
       - "1985:1985"
     command: /usr/local/srs/objs/srs -c /usr/local/srs/conf/srs.conf
+    networks:
+      - djangoflex-network
 
   postgres:
     image: ${POSTGRES_DOCKER_IMAGE:-postgres:13}
@@ -31,11 +41,14 @@ services:
       - POSTGRES_DB=${POSTGRES_DATABASE:-your_postgres_database}
     volumes:
       - ${POSTGRES_DATA_DIR:-./volume/postgres/data}:/var/lib/postgresql/data
+      # - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - djangoflex-network
 
   redis:
     image: ${REDIS_DOCKER_IMAGE:-redis:6.2.4}
@@ -45,6 +58,8 @@ services:
     volumes:
       - ${REDIS_DATA_DIR:-./volume/redis/data}:/data
     command: redis-server
+    networks:
+      - djangoflex-network
 
   django:
     build:
@@ -52,7 +67,7 @@ services:
       dockerfile: Dockerfile.django
     container_name: django_container
     command: >
-      sh -c "python djangoFlex/manage.py makemigrations &&
+      sh -c "python djangoFlex/manage.py makemigrations videoCap_server visionAI_server &&
              python djangoFlex/manage.py migrate &&
              python djangoFlex/manage.py runserver 0.0.0.0:8000"
     volumes:
@@ -62,8 +77,8 @@ services:
     environment:
       - DJANGO_SETTINGS_MODULE=djangoFlex.settings.djangoFlex
       - PYTHONPATH=/app
-      - DATABASE_HOST=postgres
-      - DATABASE_PORT=5432
+      - IS_DOCKER=True
+      - NETWORK_NAME=djangoflex-network
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,6 +88,8 @@ services:
         condition: service_started
       srs:
         condition: service_started
+    networks:
+      - djangoflex-network
 
 volumes:
   postgres_data:
