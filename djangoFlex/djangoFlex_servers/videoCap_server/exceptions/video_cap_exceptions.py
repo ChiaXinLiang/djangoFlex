@@ -1,0 +1,2 @@
+class VideoCapException(Exception):
+    pass

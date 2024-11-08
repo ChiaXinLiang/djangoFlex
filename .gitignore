@@ -70,8 +70,9 @@ my_project_visualized.dot
 my_project_visualized.png
 myapp_models.dot
 myapp_models.png
-_services
 migrations/
+_services/
+test1.py
 
 # Flask stuff:
 instance/
@@ -167,4 +168,5 @@ cython_debug/
 #.idea/
 test/video/06_04_08_26_24_s0s_1x_1000s.mp4
 
+# database
 volume/

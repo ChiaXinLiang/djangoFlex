@@ -28,7 +28,7 @@ def stream_to_rtmp(rtmp_url, source_video):
             output = ffmpeg_process.stderr.readline().decode().strip()
             if output:
                 print(output)
-            
+
             if ffmpeg_process.poll() is not None:
                 print("Streaming process has ended")
                 break
