@@ -170,3 +170,6 @@ test/video/06_04_08_26_24_s0s_1x_1000s.mp4
 
 # database
 volume/
+
+# others
+cv_algorithms/

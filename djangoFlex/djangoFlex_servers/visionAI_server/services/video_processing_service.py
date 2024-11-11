@@ -6,19 +6,21 @@ from .drawing_service import DrawingService
 from .ffmpeg_service import FFmpegService
 from ..models import CameraDrawingStatus
 from ...videoCap_server.models import CurrentVideoClip
+from ..utils.FrameInterpolator import FrameInterpolator
 from django.db import transaction
 import time
 import cv2
 
 class VideoProcessingService:
     def __init__(self):
-        # self.config_service = ConfigurationService()
-        self.detection_service = DetectionService()
         self.drawing_service = DrawingService()
         self.ffmpeg_service = FFmpegService()
+        self.rtmp_interpolator = {}
+        self.rtmp_detection_service = {}
         self.running = {}
         self.draw_threads = {}
         self.last_processed_clip = {}
+        self.interpolator_kwargs = {'frame_interval': 10}
 
     def start_draw_service(self, rtmp_url):
         self.config_service = ConfigurationService()
@@ -32,6 +34,9 @@ class VideoProcessingService:
             #     return False, "Configuration not found"
 
             self.running[rtmp_url] = True
+            self.rtmp_interpolator[rtmp_url] = FrameInterpolator(**self.interpolator_kwargs)
+            self.rtmp_detection_service[rtmp_url] = DetectionService()
+
             self.draw_threads[rtmp_url] = threading.Thread(target=self._draw_loop, args=(rtmp_url,))
             self.draw_threads[rtmp_url].start()
 
@@ -97,6 +102,7 @@ class VideoProcessingService:
                         start_time = time.time()
                         result = self._process_video_clip(rtmp_url)
                         if result is not None:
+                            # print("接收到interpolation處理結果")
                             frame_data, duration = result
                             frame_data = self.drawing_service.adjust_fps(frame_data, duration, config['fps'])
                             end_time = time.time()
@@ -104,6 +110,7 @@ class VideoProcessingService:
                             if frame_data is not None and len(frame_data) > 0:
                                 for frame in frame_data:
                                     if self.running[rtmp_url]:
+                                        # print("開始打出interpolation處理結果rtmp")
                                         self.ffmpeg_service.write_frame(rtmp_url, frame)
                                         sleep_time = max(0, ((1 - time_diff) / config['fps']))
                                         time.sleep(sleep_time)
@@ -158,24 +165,29 @@ class VideoProcessingService:
 
                 self.last_processed_clip[rtmp_url] = current_video_clip
 
-                frames, duration = self.drawing_service.read_video_frames(clip_path)
+                org_frame_list, duration = self.drawing_service.read_video_frames(clip_path)
 
-                if len(frames) > 0:
-                    '''
-                    如果視頻幀數大於 0，方法會對第一幀和最後一幀進行物件檢測，並將檢測結果繪製到所有幀上。
-                    最後，方法會刪除當前視頻剪輯的資料庫記錄和實體檔案，並返回處理後的幀和持續時間。如果視頻幀數為 0，方法會返回 None。
-                    '''
-                    first_frame = frames[0]
-                    last_frame = frames[-1]
-                    first_result = self.detection_service.detect_objects(first_frame)
-                    last_result = self.detection_service.detect_objects(last_frame)
-
-                    frames = self.drawing_service.draw_all_results(frames, first_result, last_result)
+                if len(org_frame_list) > 0:
+                    # print("開始進行interpolation處理")
+                    processed_frame_list = []
+                    frame_count = 0
+                    for frame in org_frame_list:
+                        process_frame = frame.copy()
+                        # Process frame
+                        if frame_count % self.rtmp_interpolator[rtmp_url].frame_interval == 0:
+                            process_frame = self.rtmp_interpolator[rtmp_url].process_keyframe(process_frame, frame_count, self.rtmp_detection_service[rtmp_url])
+                            self.rtmp_interpolator[rtmp_url].prev_frame_count = frame_count
+                            # print(f"Processed Keyframe: {frame_count}")
+                        else:
+                            process_frame = self.rtmp_interpolator[rtmp_url].process_interpolated_frame(process_frame, frame_count)
+                            # print(f"Processed Interpolated Frame: {frame_count}")
+                        frame_count += 1
+                        processed_frame_list.append(process_frame)
 
                     current_video_clip.delete()
                     os.remove(clip_path)
 
-                    return frames, duration
+                    return processed_frame_list, duration
                 else:
                     return None
         except Exception as e:
