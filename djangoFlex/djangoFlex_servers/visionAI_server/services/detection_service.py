@@ -19,4 +19,4 @@ class DetectionService:
             raise
 
     def detect_objects(self, frame):
-        return self.detection_model(frame, classes=[0], verbose=False, imgsz=1280)
+        return self.detection_model.track(frame, classes=[0], verbose=False, imgsz=1280, persist=True)

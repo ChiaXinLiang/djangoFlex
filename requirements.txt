@@ -22,3 +22,4 @@ mysql
 mysql-connector-python
 django_extensions
 ultralytics
+ffmpeg-python
