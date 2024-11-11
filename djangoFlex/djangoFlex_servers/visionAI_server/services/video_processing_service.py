@@ -6,19 +6,21 @@ from .drawing_service import DrawingService
 from .ffmpeg_service import FFmpegService
 from ..models import CameraDrawingStatus
 from ...videoCap_server.models import CurrentVideoClip
+from ..utils.FrameInterpolator import FrameInterpolator
 from django.db import transaction
 import time
 import cv2
 
 class VideoProcessingService:
     def __init__(self):
-        # self.config_service = ConfigurationService()
-        self.detection_service = DetectionService()
         self.drawing_service = DrawingService()
         self.ffmpeg_service = FFmpegService()
+        self.rtmp_interpolator = {}
+        self.rtmp_detection_service = {}
         self.running = {}
         self.draw_threads = {}
         self.last_processed_clip = {}
+        self.interpolator_kwargs = {'frame_interval': 10}
 
     def start_draw_service(self, rtmp_url):
         self.config_service = ConfigurationService()
@@ -32,6 +34,9 @@ class VideoProcessingService:
             #     return False, "Configuration not found"
 
             self.running[rtmp_url] = True
+            self.rtmp_interpolator[rtmp_url] = FrameInterpolator(**self.interpolator_kwargs)
+            self.rtmp_detection_service[rtmp_url] = DetectionService()
+
             self.draw_threads[rtmp_url] = threading.Thread(target=self._draw_loop, args=(rtmp_url,))
             self.draw_threads[rtmp_url].start()
 
@@ -64,10 +69,26 @@ class VideoProcessingService:
             return False, f"Error stopping draw service: {str(e)}"
 
     def _draw_loop(self, rtmp_url):
+        """
+        管理給定 RTMP URL 的視頻處理循環。
+
+        此方法嘗試啟動並維護一個 FFmpeg 過程以進行視頻處理。
+        如果失敗，它會重試指定次數。在每次嘗試期間，
+        它處理視頻剪輯，調整幀率，並將幀寫入 FFmpeg 過程。
+
+        參數:
+            rtmp_url (str): 視頻流的 RTMP URL。
+
+        引發:
+            Exception: 如果 FFmpeg 過程未運行或視頻處理在最大重試次數後失敗。
+
+        注意:
+            當循環不再運行時，此方法將停止 FFmpeg 過程。
+        """
         try:
             config = self.config_service.get_config(rtmp_url)
-            max_retries = 5
-            retry_delay = 10  # seconds
+            max_retries = 5 # 最大重試次數
+            retry_delay = 10  # 每次重試之間的延遲，seconds
 
             for attempt in range(max_retries):
                 try:
@@ -81,6 +102,7 @@ class VideoProcessingService:
                         start_time = time.time()
                         result = self._process_video_clip(rtmp_url)
                         if result is not None:
+                            # print("接收到interpolation處理結果")
                             frame_data, duration = result
                             frame_data = self.drawing_service.adjust_fps(frame_data, duration, config['fps'])
                             end_time = time.time()
@@ -88,6 +110,7 @@ class VideoProcessingService:
                             if frame_data is not None and len(frame_data) > 0:
                                 for frame in frame_data:
                                     if self.running[rtmp_url]:
+                                        # print("開始打出interpolation處理結果rtmp")
                                         self.ffmpeg_service.write_frame(rtmp_url, frame)
                                         sleep_time = max(0, ((1 - time_diff) / config['fps']))
                                         time.sleep(sleep_time)
@@ -142,20 +165,29 @@ class VideoProcessingService:
 
                 self.last_processed_clip[rtmp_url] = current_video_clip
 
-                frames, duration = self.drawing_service.read_video_frames(clip_path)
+                org_frame_list, duration = self.drawing_service.read_video_frames(clip_path)
 
-                if len(frames) > 0:
-                    first_frame = frames[0]
-                    last_frame = frames[-1]
-                    first_result = self.detection_service.detect_objects(first_frame)
-                    last_result = self.detection_service.detect_objects(last_frame)
-
-                    frames = self.drawing_service.draw_all_results(frames, first_result, last_result)
+                if len(org_frame_list) > 0:
+                    # print("開始進行interpolation處理")
+                    processed_frame_list = []
+                    frame_count = 0
+                    for frame in org_frame_list:
+                        process_frame = frame.copy()
+                        # Process frame
+                        if frame_count % self.rtmp_interpolator[rtmp_url].frame_interval == 0:
+                            process_frame = self.rtmp_interpolator[rtmp_url].process_keyframe(process_frame, frame_count, self.rtmp_detection_service[rtmp_url])
+                            self.rtmp_interpolator[rtmp_url].prev_frame_count = frame_count
+                            # print(f"Processed Keyframe: {frame_count}")
+                        else:
+                            process_frame = self.rtmp_interpolator[rtmp_url].process_interpolated_frame(process_frame, frame_count)
+                            # print(f"Processed Interpolated Frame: {frame_count}")
+                        frame_count += 1
+                        processed_frame_list.append(process_frame)
 
                     current_video_clip.delete()
                     os.remove(clip_path)
 
-                    return frames, duration
+                    return processed_frame_list, duration
                 else:
                     return None
         except Exception as e:

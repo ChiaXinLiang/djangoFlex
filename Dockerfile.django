@@ -1,0 +1,27 @@
+FROM python:3.12
+
+# 安裝基本網絡工具
+RUN apt-get update && apt-get install -y \
+    iputils-ping \
+    net-tools \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy requirements file
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy project files
+COPY . .
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV IS_DOCKER=True
+
+# Expose port
+EXPOSE 8000

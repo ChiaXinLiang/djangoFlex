@@ -47,6 +47,7 @@ djangoFlex comes pre-loaded with a smorgasbord of goodies:
 
 6. Apply database migrations:
    ```
+   sudo docker-compose exec django bash
    cd djangoFlex
    python manage.py makemigrations
    python manage.py migrate

@@ -67,7 +67,7 @@ if __name__ == '__main__':
     parser.add_argument('--source2', default="./video/outpu9.mp4", help='第二條源影片檔案路徑')
 
     parser.add_argument('--rtmp3', default="rtmp://localhost/live/livestream/3", help='RTMP URL')
-    parser.add_argument('--source3', default="./video/0641.mp4", help='第三條源影片檔案路徑')
+    parser.add_argument('--source3', default="./video/output3.mp4", help='第三條源影片檔案路徑')
 
     args = parser.parse_args()
 
