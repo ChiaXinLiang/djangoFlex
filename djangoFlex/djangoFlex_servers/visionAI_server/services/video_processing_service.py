@@ -20,7 +20,6 @@ class VideoProcessingService:
         self.running = {}
         self.draw_threads = {}
         self.last_processed_clip = {}
-        self.interpolator_kwargs = {'frame_interval': 10}
 
     def start_draw_service(self, rtmp_url):
         self.config_service = ConfigurationService()
@@ -30,11 +29,11 @@ class VideoProcessingService:
                 return False, "Draw service already running"
 
             config = self.config_service.get_config(rtmp_url)
-            # if not config:
-            #     return False, "Configuration not found"
+            if not config:
+                return False, "Configuration not found"
 
             self.running[rtmp_url] = True
-            self.rtmp_interpolator[rtmp_url] = FrameInterpolator(**self.interpolator_kwargs)
+            self.rtmp_interpolator[rtmp_url] = FrameInterpolator()
             self.rtmp_detection_service[rtmp_url] = DetectionService()
 
             self.draw_threads[rtmp_url] = threading.Thread(target=self._draw_loop, args=(rtmp_url,))
@@ -100,6 +99,7 @@ class VideoProcessingService:
                             raise Exception("FFmpeg process is not running")
 
                         start_time = time.time()
+                        # print("開始進行interpolation處理")
                         result = self._process_video_clip(rtmp_url)
                         if result is not None:
                             # print("接收到interpolation處理結果")
@@ -132,6 +132,7 @@ class VideoProcessingService:
         try:
             with transaction.atomic():
                 config = self.config_service.get_config(rtmp_url)
+
                 current_video_clip = CurrentVideoClip.objects.filter(config__rtmp_url=rtmp_url).order_by('-start_time').first()
 
                 if current_video_clip is None:
@@ -163,18 +164,22 @@ class VideoProcessingService:
                 if self._is_clip_already_processed(rtmp_url, current_video_clip):
                     return None
 
+                # print("找到指定的路徑")
                 self.last_processed_clip[rtmp_url] = current_video_clip
 
+                # print("開始讀取視頻幀")
                 org_frame_list, duration = self.drawing_service.read_video_frames(clip_path)
 
                 if len(org_frame_list) > 0:
                     # print("開始進行interpolation處理")
                     processed_frame_list = []
+                    total_frame_number = len(org_frame_list) - 1
+                    middle_frame_number = int(total_frame_number/2)
                     frame_count = 0
                     for frame in org_frame_list:
                         process_frame = frame.copy()
                         # Process frame
-                        if frame_count % self.rtmp_interpolator[rtmp_url].frame_interval == 0:
+                        if frame_count == 0 or frame_count == middle_frame_number or frame_count == total_frame_number:
                             process_frame = self.rtmp_interpolator[rtmp_url].process_keyframe(process_frame, frame_count, self.rtmp_detection_service[rtmp_url])
                             self.rtmp_interpolator[rtmp_url].prev_frame_count = frame_count
                             # print(f"Processed Keyframe: {frame_count}")
